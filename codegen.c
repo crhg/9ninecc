@@ -124,6 +124,13 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->ty == ND_BLOCK) {
+        for(int i = 0; i < node->stmts->len; i++) {
+            gen(node->stmts->data[i]);
+        }
+        return;
+    }
+
     gen(node->lhs);
     gen(node->rhs);
 

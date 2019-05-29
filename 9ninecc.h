@@ -51,6 +51,7 @@ enum {
     ND_WHILE,
     ND_FOR,
     ND_EXPR,      // <式>; 文
+    ND_BLOCK,
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -66,6 +67,7 @@ typedef struct Node {
     struct Node *else_stmt; // ND_IFのときのelse文
     struct Node *init; // ND_FORのときの１つ目の式
     struct Node *next; // ND_FORのときの３つ目の式
+    Vector *stmts; // ND_BLOCKの時のstmtのベクタ
     int val;   // tyがND_NUMの場合のみ使う
     int offset; // tyがND_IDENTの場合のみ使う
 } Node;

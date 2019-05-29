@@ -173,7 +173,6 @@ Node *stmt() {
         return node;
     }
 
-
     if (consume(TK_WHILE)) {
         node = new_node(ND_WHILE, NULL, NULL);
 
@@ -224,6 +223,21 @@ Node *stmt() {
 
         return node;
     }
+
+    if (consume('{')) {
+        node = new_node(ND_BLOCK, NULL, NULL);
+        Vector *stmts = new_vector();
+        node->stmts = stmts;
+
+        while (!consume('}')) {
+            vec_push(stmts, stmt());
+        }
+
+        return node;
+    }
+
+
+
 
     if (consume(TK_RETURN)) {
         node = new_node(ND_RETURN, expr(), NULL);
