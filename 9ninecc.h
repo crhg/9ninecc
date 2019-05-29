@@ -8,6 +8,16 @@ typedef struct {
 Vector *new_vector();
 void vec_push(Vector *vec, void *elem);
 
+// マップ
+typedef struct {
+    Vector *keys;
+    Vector *vals;
+} Map;
+
+Map *new_map();
+void map_put(Map *map, char *key, void *val);
+void *map_get(Map *map, char *key);
+
 // トークンの型を表す値
 enum {
     TK_NUM = 256, // 整数トークン
