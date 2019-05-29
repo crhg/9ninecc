@@ -1,7 +1,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <strings.h>
+#include <string.h>
 #include "9ninecc.h"
 
 // 入力プログラム
@@ -98,6 +98,12 @@ void tokenize() {
 
             push_token(*p, p);
             p++;
+            continue;
+        }
+
+        if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
+            push_token(TK_RETURN, p);
+            p += 6;
             continue;
         }
 

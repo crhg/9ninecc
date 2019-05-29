@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
-// 2項演算子のノードを作る
+// ノードを作る
 Node *new_node(int ty, Node *lhs, Node *rhs) {
     Node *node = malloc(sizeof(Node));
     node->ty = ty;
@@ -131,7 +131,13 @@ Node *expr() {
 
 // 文のパーサ
 Node *stmt() {
-    Node *node = expr();
+    Node *node;
+    if (consume(TK_RETURN)) {
+        node = new_node(ND_RETURN, expr(), NULL);
+    } else {
+        node = expr();
+    }
+
     if (!consume(';'))
         error_at(TOKEN(pos)->input, "';'ではないトークンです");
     return node;

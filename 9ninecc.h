@@ -13,6 +13,7 @@ enum {
     TK_NUM = 256, // 整数トークン
     TK_IDENT,     // 識別子
     TK_EOF,       // 入力の終わり
+    TK_RETURN,    // return
     TK_EQ,        // ==
     TK_NE,        // !=
     TK_LE,        // <=
@@ -30,6 +31,7 @@ typedef struct {
 enum {
     ND_NUM = 256, // 整数のノードの型
     ND_IDENT,     // 識別子
+    ND_RETURN,    // return
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -85,6 +87,8 @@ extern Node *code[];
 // コード生成
 void gen(Node *node);
 
+// その他
+int is_alnum(char c);
 
 // テスト
 void runtest();

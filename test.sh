@@ -45,6 +45,7 @@ try 1 "2<=2;"
 try 1 "2<=3;"
 try 4 "a=2;a*2;"
 try 3 "a=1;z=2;a+z;"
+try 2 "return 2;3;"
 
 echo OK
 
