@@ -99,7 +99,7 @@ void tokenize() {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/') {
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
             tokens[i].ty = *p;
             tokens[i].input = p;
             i++;
@@ -123,6 +123,7 @@ void tokenize() {
 }
 
 Node *mul();
+Node *term();
 
 // 式のパーサ
 Node *expr() {
@@ -140,21 +141,34 @@ Node *expr() {
 
 // mulのパーサ
 Node *mul() {
-    Token *num;
-    if ((num = consume(TK_NUM)) == NULL)
-        error_at(tokens[pos].input, "数でありません");
-
-    Node *node = new_node_num(num->val);
+    Node *node = term();
 
     for (;;) {
         if (consume('*'))
-            node = new_node('*', node, expr());
+            node = new_node('*', node, term());
         else if (consume('/'))
-            node = new_node('/', node, expr());
+            node = new_node('/', node, term());
         else
             return node;
     }
 }
+
+// termのパーサ
+Node *term() {
+    if (consume('(')) {
+        Node *node = expr();
+        if (!consume(')'))
+            error_at(tokens[pos].input, "開きカッコに対応する閉じカッコがありません");
+        return node;
+    }
+
+    Token *num;
+    if (num = consume(TK_NUM))
+        return new_node_num(num->val);
+
+    error_at(tokens[pos].input, "数値でも開きカッコでもないトークンです");
+}
+
 
 // コード生成
 void gen(Node *node) {
