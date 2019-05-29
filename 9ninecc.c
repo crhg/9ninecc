@@ -8,6 +8,10 @@
 enum {
     TK_NUM = 256, // 整数トークン
     TK_EOF,       // 入力の終わり
+    TK_EQ,        // ==
+    TK_NE,        // !=
+    TK_LE,        // <=
+    TK_GE,        // >=
 };
 
 // トークンの型
@@ -20,6 +24,9 @@ typedef struct {
 // ノードの型を表す値
 enum {
     ND_NUM = 256, // 整数のノードの型
+    ND_EQ,        // ==
+    ND_NE,        // !=
+    ND_LE,        // <=
 };
 
 // ノードの型
@@ -107,6 +114,54 @@ void tokenize() {
             continue;
         }
 
+        if (*p == '=' && *(p+1) == '=') {
+            tokens[i].ty = TK_EQ;
+            tokens[i].input = p;
+            i++;
+            p+=2;
+            continue;
+        }
+
+        if (*p == '!' && *(p+1) == '=') {
+            tokens[i].ty = TK_NE;
+            tokens[i].input = p;
+            i++;
+            p+=2;
+            continue;
+        }
+
+        if (*p == '>') {
+            if (*(p+1) == '=') {
+                tokens[i].ty = TK_GE;
+                tokens[i].input = p;
+                i++;
+                p+=2;
+                continue;
+            }
+
+            tokens[i].ty = *p;
+            tokens[i].input = p;
+            i++;
+            p++;
+            continue;
+        }
+
+        if (*p == '<') {
+            if (*(p+1) == '=') {
+                tokens[i].ty = TK_LE;
+                tokens[i].input = p;
+                i++;
+                p+=2;
+                continue;
+            }
+
+            tokens[i].ty = *p;
+            tokens[i].input = p;
+            i++;
+            p++;
+            continue;
+        }
+
         if (isdigit(*p)) {
             tokens[i].ty = TK_NUM;
             tokens[i].input = p;
@@ -122,12 +177,53 @@ void tokenize() {
     tokens[i].input = p;
 }
 
+Node *expr();
+Node *equality();
+Node *relational();
+Node *add();
 Node *mul();
 Node *unary();
 Node *term();
 
 // 式のパーサ
 Node *expr() {
+    return equality();
+}
+
+// ==と!=のパーサ
+Node *equality() {
+    Node *node = relational();
+
+    for (;;) {
+        if (consume(TK_EQ))
+            node = new_node(ND_EQ, node, relational());
+        else if (consume(TK_NE))
+            node = new_node(ND_NE, node, relational());
+        else
+            return node;
+    }
+}
+
+// 大小関係のバーサ
+Node *relational() {
+    Node *node = add();
+
+    for (;;) {
+        if (consume('<'))
+            node = new_node('<', node, add());
+        else if (consume(TK_LE))
+            node = new_node(ND_LE, node, add());
+        else if (consume('>'))
+            node = new_node('<', add(), node);
+        else if (consume(TK_GE))
+            node = new_node(ND_LE, add(), node);
+        else
+            return node;
+    }
+}
+
+// addのパーサ
+Node *add() {
     Node *node = mul();
 
     for (;;) {
@@ -206,6 +302,26 @@ void gen(Node *node) {
     case '/':
         printf("  cqo\n");
         printf("  idiv rdi\n");
+        break;
+    case ND_EQ:
+        printf("  cmp rax, rdi\n");
+        printf("  sete al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case ND_NE:
+        printf("  cmp rax, rdi\n");
+        printf("  setne al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case '<':
+        printf("  cmp rax, rdi\n");
+        printf("  setl al\n");
+        printf("  movzb rax, al\n");
+        break;
+    case ND_LE:
+        printf("  cmp rax, rdi\n");
+        printf("  setle al\n");
+        printf("  movzb rax, al\n");
         break;
     default:
         error("知らないノード種別: %d\n", node->ty);
