@@ -54,6 +54,8 @@ try 2 "if(1)return 2;else return 3;return 4;"
 try 3 "if(0)return 2;else return 3;return 4;"
 try 5 "a=0;while(a != 5) a=a+1; return a;"
 #try 0 "a=0;while(a != 99999999) a=a+1; return 0;" # segvする。たぶんループ毎にスタックが伸びている
+try 50 "b=0;for(a=0;a<5;a=a+1) b=b+10; return b;"
+#try 0 "for(a=0; a != 99999999; a=a+1) a;" # segvする。たぶんループ毎にスタックが伸びている
 
 echo OK
 
