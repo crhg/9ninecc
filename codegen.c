@@ -1,10 +1,44 @@
 #include <stdio.h>
 #include "9ninecc.h"
 
+// 左辺値のコード生成
+// アドレスをスタックトップにプッシュする
+void gen_lval(Node *node) {
+    if (node->ty != ND_IDENT)
+        error("代入の左辺値が変数ではありません");
+
+    int offset = ('z' - node->name + 1) * 8;
+    printf("  mov rax, rbp\n");
+    printf("  sub rax, %d\n", offset);
+    printf("  push rax\n");
+}
+
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_NUM) {
         printf("  push %d\n", node->val);
+        return;
+    }
+
+    if (node->ty == ND_IDENT) {
+        // 変数の読み出し
+        // アドレスを求めて間接参照で読み出す
+        gen_lval(node);
+        printf("  pop rax\n");
+        printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
+    }
+
+    if (node->ty == '=') {
+        // 代入
+        gen_lval(node->lhs);
+        gen(node->rhs);
+
+        printf("  pop rdi\n");
+        printf("  pop rax\n");
+        printf("  mov [rax], rdi\n");
+        printf("  push rdi\n"); // 全体の値は右辺の計算結果
         return;
     }
 

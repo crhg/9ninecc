@@ -11,6 +11,7 @@ void vec_push(Vector *vec, void *elem);
 // トークンの型を表す値
 enum {
     TK_NUM = 256, // 整数トークン
+    TK_IDENT,     // 識別子
     TK_EOF,       // 入力の終わり
     TK_EQ,        // ==
     TK_NE,        // !=
@@ -28,6 +29,7 @@ typedef struct {
 // ノードの型を表す値
 enum {
     ND_NUM = 256, // 整数のノードの型
+    ND_IDENT,     // 識別子
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -38,7 +40,8 @@ typedef struct Node {
     int ty;
     struct Node *lhs;
     struct Node *rhs;
-    int val; // tyがND_NUMの場合のみ使う
+    int val;   // tyがND_NUMの場合のみ使う
+    char name; // tyがND_IDENTの場合のみ使う
 } Node;
 
 // 2項演算子のノードを作る
@@ -75,13 +78,9 @@ _Noreturn void error_at(char *loc, char *msg);
 // トークンに分割して保存する
 void tokenize();
 
-Node *expr();
-Node *equality();
-Node *relational();
-Node *add();
-Node *mul();
-Node *unary();
-Node *term();
+// パーサ
+void program();
+extern Node *code[];
 
 // コード生成
 void gen(Node *node);

@@ -53,15 +53,21 @@ void tokenize() {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')') {
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/' || *p == '(' || *p == ')' || *p == ';') {
             push_token(*p, p);
             p++;
             continue;
         }
 
-        if (*p == '=' && *(p+1) == '=') {
-            push_token(TK_EQ, p);
-            p+=2;
+        if (*p == '=') {
+            if (*(p+1) == '=') {
+                push_token(TK_EQ, p);
+                p+=2;
+                continue;
+            }
+
+            push_token(*p, p);
+            p++;
             continue;
         }
 
@@ -98,6 +104,12 @@ void tokenize() {
         if (isdigit(*p)) {
             Token *num_token = push_token(TK_NUM, p);
             num_token->val = strtol(p, &p, 10);
+            continue;
+        }
+
+        if ('a' <= *p && *p <= 'z') {
+            push_token(TK_IDENT, p);
+            p++;
             continue;
         }
 

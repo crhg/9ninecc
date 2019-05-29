@@ -18,20 +18,67 @@ Node *new_node_num(int val) {
     return node;
 }
 
-// 式のパーサ
-Node *expr() {
-    return equality();
+// 識別子のノードを作る
+Node *new_node_ident(char name) {
+    Node *node = malloc(sizeof(Node));
+    node->ty = ND_IDENT;
+    node->name = name;
+    return node;
 }
 
-// ==と!=のパーサ
-Node *equality() {
-    Node *node = relational();
+Node *expr();
+
+// termのパーサ
+Node *term() {
+    if (consume('(')) {
+        Node *node = expr();
+        if (!consume(')'))
+            error_at(TOKEN(pos)->input, "開きカッコに対応する閉じカッコがありません");
+        return node;
+    }
+
+    Token *token;
+    if ((token = consume(TK_NUM)) != NULL)
+        return new_node_num(token->val);
+
+    if ((token = consume(TK_IDENT)) != NULL)
+        return new_node_ident(*(token->input));
+
+    error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
+}
+
+// unaryのパーサ
+Node *unary() {
+    if (consume('+'))
+        return term();
+    if (consume('-'))
+        return new_node('-', new_node_num(0), term());
+    return term();
+}
+
+// mulのパーサ
+Node *mul() {
+    Node *node = unary();
 
     for (;;) {
-        if (consume(TK_EQ))
-            node = new_node(ND_EQ, node, relational());
-        else if (consume(TK_NE))
-            node = new_node(ND_NE, node, relational());
+        if (consume('*'))
+            node = new_node('*', node, unary());
+        else if (consume('/'))
+            node = new_node('/', node, unary());
+        else
+            return node;
+    }
+}
+
+// addのパーサ
+Node *add() {
+    Node *node = mul();
+
+    for (;;) {
+        if (consume('+'))
+            node = new_node('+', node, mul());
+        else if (consume('-'))
+            node = new_node('-', node, mul());
         else
             return node;
     }
@@ -55,55 +102,48 @@ Node *relational() {
     }
 }
 
-// addのパーサ
-Node *add() {
-    Node *node = mul();
+// ==と!=のパーサ
+Node *equality() {
+    Node *node = relational();
 
     for (;;) {
-        if (consume('+'))
-            node = new_node('+', node, mul());
-        else if (consume('-'))
-            node = new_node('-', node, mul());
+        if (consume(TK_EQ))
+            node = new_node(ND_EQ, node, relational());
+        else if (consume(TK_NE))
+            node = new_node(ND_NE, node, relational());
         else
             return node;
     }
 }
 
-// mulのパーサ
-Node *mul() {
-    Node *node = unary();
-
-    for (;;) {
-        if (consume('*'))
-            node = new_node('*', node, unary());
-        else if (consume('/'))
-            node = new_node('/', node, unary());
-        else
-            return node;
-    }
+// 代入式のパーサ
+Node *assign() {
+    Node *node = equality();
+    if (consume('='))
+        node = new_node('=', node, assign());
+    return node;
 }
 
-// unaryのパーサ
-Node *unary() {
-    if (consume('+'))
-        return term();
-    if (consume('-'))
-        return new_node('-', new_node_num(0), term());
-    return term();
+// 式のパーサ
+Node *expr() {
+    return assign();
 }
 
-// termのパーサ
-Node *term() {
-    if (consume('(')) {
-        Node *node = expr();
-        if (!consume(')'))
-            error_at(TOKEN(pos)->input, "開きカッコに対応する閉じカッコがありません");
-        return node;
-    }
+// 文のパーサ
+Node *stmt() {
+    Node *node = expr();
+    if (!consume(';'))
+        error_at(TOKEN(pos)->input, "';'ではないトークンです");
+    return node;
+}
 
-    Token *num;
-    if ((num = consume(TK_NUM)) != NULL)
-        return new_node_num(num->val);
+// プログラムを保存する配列
+Node *code[100];
 
-    error_at(TOKEN(pos)->input, "数値でも開きカッコでもないトークンです");
+// プログラムのパーサ
+void program() {
+    int i = 0;
+    while (TOKEN(pos)->ty != TK_EOF)
+        code[i++] = stmt();
+    code[i] = NULL;
 }
