@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include "9ninecc.h"
 
+// ラベル番号
+int label_seq = 0;
+
 // 左辺値のコード生成
 // アドレスをスタックトップにプッシュする
 void gen_lval(Node *node) {
@@ -47,6 +50,30 @@ void gen(Node *node) {
         printf("  mov rsp, rbp\n");
         printf("  pop rbp\n");
         printf("  ret\n");
+        return;
+    }
+
+    if (node->ty == ND_IF) {
+        printf("# if!!\n");
+        gen(node->cond);
+        int seq = label_seq++;
+
+        if (node->else_stmt == NULL) {
+            printf("  pop rax\n");
+            printf("  cmp rax, 0\n");
+            printf("  je .Lend%d\n", seq);
+            gen(node->stmt);
+            printf(".Lend%d:\n", seq);
+        } else {
+            printf("  pop rax\n");
+            printf("  cmp rax, 0\n");
+            printf("  je .Lelse%d\n", seq);
+            gen(node->stmt);
+            printf("  jmp .Lend%d\n", seq);
+            printf(".Lelse%d:\n", seq);
+            gen(node->else_stmt);
+            printf(".Lend%d:\n", seq);
+        }
         return;
     }
 

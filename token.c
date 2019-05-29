@@ -68,6 +68,21 @@ Token *push_token(int ty, char *input) {
     return token;
 }
 
+// ポインタの指すところにキーワードがあるか。
+// *np にキーワードの次の文字のポインタを返す
+int keyword(char *p, char **np, char *name) {
+    int l = strlen(name);
+    if (strncmp(p, name, l) == 0 && !is_alnum(p[l])) {
+        *np = p + l;
+        return 1;
+    }
+    
+    return 0;
+}
+
+
+
+
 // user_inputが指している文字列を
 // トークンに分割してtokensに保存する
 void tokenize() {
@@ -129,11 +144,37 @@ void tokenize() {
             continue;
         }
 
-        if (strncmp(p, "return", 6) == 0 && !is_alnum(p[6])) {
+        char *np;
+        if (keyword(p, &np, "return")) {
             push_token(TK_RETURN, p);
-            p += 6;
+            p = np;
             continue;
         }
+
+        if (keyword(p, &np, "if")) {
+            push_token(TK_IF, p);
+            p = np;
+            continue;
+        }
+
+        if (keyword(p, &np, "else")) {
+            push_token(TK_ELSE, p);
+            p = np;
+            continue;
+        }
+
+        if (keyword(p, &np, "while")) {
+            push_token(TK_WHILE, p);
+            p = np;
+            continue;
+        }
+
+        if (keyword(p, &np, "for")) {
+            push_token(TK_FOR, p);
+            p = np;
+            continue;
+        }
+
 
         if (isdigit(*p)) {
             Token *num_token = push_token(TK_NUM, p);

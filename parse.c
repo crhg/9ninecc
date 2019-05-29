@@ -150,6 +150,81 @@ Node *expr() {
 // 文のパーサ
 Node *stmt() {
     Node *node;
+
+    if (consume(TK_IF)) {
+        node = new_node(ND_IF, NULL, NULL);
+
+        if (!consume('('))
+            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+
+        node->cond = expr();
+
+        if (!consume(')'))
+            error_at(TOKEN(pos)->input, "')'ではないトークンです");
+
+        node->stmt = stmt();
+
+        if (consume(TK_ELSE)) {
+            node->else_stmt = stmt();
+        } else {
+            node->else_stmt = NULL;
+        }
+
+        return node;
+    }
+
+
+    if (consume(TK_WHILE)) {
+        node = new_node(ND_WHILE, NULL, NULL);
+
+        if (!consume('('))
+            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+
+        node->cond = expr();
+
+        if (!consume(')'))
+            error_at(TOKEN(pos)->input, "')'ではないトークンです");
+
+        node->stmt = stmt();
+
+        return node;
+    }
+
+    if (consume(TK_FOR)) {
+        node = new_node(ND_FOR, NULL, NULL);
+
+        if (!consume('('))
+            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+
+        if (consume(';')) {
+            node->init = NULL;
+        } else {
+            node->init = expr();
+            if (!consume(';'))
+                error_at(TOKEN(pos)->input, "';'ではないトークンです");
+        }
+
+        if (consume(';')) {
+            node->cond = NULL;
+        } else {
+            node->cond = expr();
+            if (!consume(';'))
+                error_at(TOKEN(pos)->input, "';'ではないトークンです");
+        }
+
+        if (consume(')')) {
+            node->next = NULL;
+        } else {
+            node->next = expr();
+            if (!consume(')'))
+                error_at(TOKEN(pos)->input, "')'ではないトークンです");
+        }
+
+        node->stmt = stmt();
+
+        return node;
+    }
+
     if (consume(TK_RETURN)) {
         node = new_node(ND_RETURN, expr(), NULL);
     } else {

@@ -24,6 +24,10 @@ enum {
     TK_IDENT,     // 識別子
     TK_EOF,       // 入力の終わり
     TK_RETURN,    // return
+    TK_IF,
+    TK_ELSE,
+    TK_WHILE,
+    TK_FOR,
     TK_EQ,        // ==
     TK_NE,        // !=
     TK_LE,        // <=
@@ -43,6 +47,9 @@ enum {
     ND_NUM = 256, // 整数のノードの型
     ND_IDENT,     // 識別子
     ND_RETURN,    // return
+    ND_IF,
+    ND_WHILE,
+    ND_FOR,
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -53,6 +60,11 @@ typedef struct Node {
     int ty;
     struct Node *lhs;
     struct Node *rhs;
+    struct Node *cond; // ND_IF, ND_WHILE, ND_FORのときの条件式
+    struct Node *stmt; // ND_IF, ND_WHILE, ND_FORのときの実行文
+    struct Node *else_stmt; // ND_IFのときのelse文
+    struct Node *init; // ND_FORのときの１つ目の式
+    struct Node *next; // ND_FORのときの３つ目の式
     int val;   // tyがND_NUMの場合のみ使う
     int offset; // tyがND_IDENTの場合のみ使う
 } Node;

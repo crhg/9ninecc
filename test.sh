@@ -48,6 +48,10 @@ try 3 "a=1;z=2;a+z;"
 try 2 "return 2;3;"
 # try 1 "-9223372036854775808 == -9223372036854775807 - 1;" # 最小の負の整数
 try 3 "abc=1;abd=2;abc+abd;"
+try 2 "if(1)return 2; return 3;"
+try 3 "if(0)return 2; return 3;"
+try 2 "if(1)return 2;else return 3;return 4;"
+try 3 "if(0)return 2;else return 3;return 4;"
 
 echo OK
 
