@@ -47,9 +47,6 @@ int main(int argc, char **argv) {
     // コード生成
     for (int i = 0; code[i]; i++) {
         gen(code[i]);
-
-        // スタックトップの式の評価結果をポップ
-        printf("  pop rax\n");
     }
 
     // エピローグ

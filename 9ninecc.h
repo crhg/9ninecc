@@ -50,6 +50,7 @@ enum {
     ND_IF,
     ND_WHILE,
     ND_FOR,
+    ND_EXPR,      // <式>; 文
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=

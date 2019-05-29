@@ -228,7 +228,7 @@ Node *stmt() {
     if (consume(TK_RETURN)) {
         node = new_node(ND_RETURN, expr(), NULL);
     } else {
-        node = expr();
+        node = new_node(ND_EXPR, expr(), NULL);
     }
 
     if (!consume(';'))
