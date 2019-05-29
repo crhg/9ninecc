@@ -1,6 +1,24 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
+// ローカル変数のマップ
+Map *local_var_map;
+
+// ローカル変数のオフセットを取得する
+// マップに未登録なら登録する。
+int get_local_var_offset(char *name) {
+    int *offset_p = map_get(local_var_map, name);
+    if (offset_p != NULL) {
+        return *offset_p;
+    }
+
+    offset_p = malloc(sizeof(int));
+    *offset_p = local_var_map->keys->len * 8;
+    map_put(local_var_map, name, offset_p);
+
+    return *offset_p;
+}
+
 // ノードを作る
 Node *new_node(int ty, Node *lhs, Node *rhs) {
     Node *node = malloc(sizeof(Node));
@@ -19,10 +37,10 @@ Node *new_node_num(int val) {
 }
 
 // 識別子のノードを作る
-Node *new_node_ident(char name) {
+Node *new_node_ident(char *name) {
     Node *node = malloc(sizeof(Node));
     node->ty = ND_IDENT;
-    node->name = name;
+    node->offset = get_local_var_offset(name);
     return node;
 }
 
@@ -42,7 +60,7 @@ Node *term() {
         return new_node_num(token->val);
 
     if ((token = consume(TK_IDENT)) != NULL)
-        return new_node_ident(*(token->input));
+        return new_node_ident(token->name);
 
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }
@@ -148,6 +166,8 @@ Node *code[100];
 
 // プログラムのパーサ
 void program() {
+    local_var_map = new_map();
+
     int i = 0;
     while (TOKEN(pos)->ty != TK_EOF)
         code[i++] = stmt();

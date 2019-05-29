@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 #include "9ninecc.h"
 
 Map *new_map() {

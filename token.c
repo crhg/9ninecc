@@ -23,6 +23,34 @@ Token *consume(int ty) {
     return TOKEN(pos++);
 }
 
+// ポインタで示されたところから名前の長さを求める
+size_t name_length(char *p) {
+    size_t r = 0;
+    while (is_alnum(*p)) {
+        p++;
+        r++;
+    }
+
+    return r;
+}
+
+
+// ポインタで示されたところから名前を切り出して
+// メモリを確保して複製して返す。
+// rpがNULLでなければ名前のつぎの文字を指すポインタを書き込む
+char *dup_name(char *p, char **rp) {
+    size_t l = name_length(p);
+    char *r = malloc(l + 1);
+    memcpy(r, p, l);
+    r[l] = '\0';
+
+    if (rp) {
+        *rp = p + l;
+    }
+
+    return r;
+}
+
 // エラー箇所を報告するための関数
 void error_at(char *loc, char *msg) {
     int pos = loc - user_input;
@@ -114,8 +142,8 @@ void tokenize() {
         }
 
         if ('a' <= *p && *p <= 'z') {
-            push_token(TK_IDENT, p);
-            p++;
+            Token *ident_token = push_token(TK_IDENT, p);
+            ident_token->name = dup_name(p, &p);
             continue;
         }
 
