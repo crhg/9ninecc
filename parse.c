@@ -97,7 +97,7 @@ Node *term() {
     if (consume('(')) {
         Node *node = expr();
         if (!consume(')'))
-            error_at(tokens[pos].input, "開きカッコに対応する閉じカッコがありません");
+            error_at(TOKEN(pos)->input, "開きカッコに対応する閉じカッコがありません");
         return node;
     }
 
@@ -105,5 +105,5 @@ Node *term() {
     if ((num = consume(TK_NUM)) != NULL)
         return new_node_num(num->val);
 
-    error_at(tokens[pos].input, "数値でも開きカッコでもないトークンです");
+    error_at(TOKEN(pos)->input, "数値でも開きカッコでもないトークンです");
 }

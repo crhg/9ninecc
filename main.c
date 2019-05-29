@@ -22,13 +22,18 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    if (strcmp(argv[1], "-test") == 0) {
+        runtest();
+        exit(0);
+    }
+
     // トークナイズする
     user_input = argv[1];
     tokenize();
     Node *node = expr();
 
     if (!consume(TK_EOF))
-        error_at(tokens[pos].input, "EOFでありません");
+        error_at(TOKEN(pos)->input, "EOFでありません");
 
     // アセンブリの前半部分を出力
     printf(".intel_syntax noprefix\n");

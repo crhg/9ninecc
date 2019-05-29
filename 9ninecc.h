@@ -1,3 +1,13 @@
+// 可変長ベクタ
+typedef struct {
+    void **data;
+    int capacity;
+    int len;
+} Vector;
+
+Vector *new_vector();
+void vec_push(Vector *vec, void *elem);
+
 // トークンの型を表す値
 enum {
     TK_NUM = 256, // 整数トークン
@@ -40,9 +50,13 @@ Node *new_node_num(int val);
 // 入力プログラム
 extern char *user_input;
 
-// トーク結果のトークン列はこの配列に保存する
-// 100個以上のトークンは来ないものとする
-extern Token tokens[];
+// トークン列を保存するベクター
+extern Vector *token_vector;
+
+// 指定された位置のトークンを返すマクロ
+#define TOKEN(pos) ((Token *)(token_vector->data[pos]))
+
+// トークンの読み出し位置
 extern int pos;
 
 // 次のトークンが期待した値かチェックして
@@ -58,7 +72,7 @@ _Noreturn void error(char *fmt, ...);
 _Noreturn void error_at(char *loc, char *msg);
 
 // user_inputが指している文字列を
-// トークンに分割してtokensに保存する
+// トークンに分割して保存する
 void tokenize();
 
 Node *expr();
@@ -71,3 +85,7 @@ Node *term();
 
 // コード生成
 void gen(Node *node);
+
+
+// テスト
+void runtest();
