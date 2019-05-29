@@ -77,6 +77,22 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->ty == ND_WHILE) {
+        printf("# while!!\n");
+        int seq = label_seq++;
+
+        printf(".Lbegin%d:\n", seq);
+        gen(node->cond);
+        printf("  pop rax\n");
+        printf("  cmp rax, 0\n");
+        printf("  je .Lend%d\n", seq);
+        gen(node->stmt);
+        printf("  jmp .Lbegin%d\n", seq);
+        printf(".Lend%d:\n", seq);
+
+        return;
+    }
+
     gen(node->lhs);
     gen(node->rhs);
 

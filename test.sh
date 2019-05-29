@@ -52,6 +52,7 @@ try 2 "if(1)return 2; return 3;"
 try 3 "if(0)return 2; return 3;"
 try 2 "if(1)return 2;else return 3;return 4;"
 try 3 "if(0)return 2;else return 3;return 4;"
+try 5 "a=0;while(a != 5) a=a+1; return a;"
 
 echo OK
 
