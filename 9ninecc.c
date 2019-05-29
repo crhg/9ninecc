@@ -99,7 +99,7 @@ void tokenize() {
             continue;
         }
 
-        if (*p == '+' || *p == '-') {
+        if (*p == '+' || *p == '-' || *p == '*') {
             tokens[i].ty = *p;
             tokens[i].input = p;
             i++;
@@ -122,8 +122,24 @@ void tokenize() {
     tokens[i].input = p;
 }
 
+Node *mul();
+
 // 式のパーサ
 Node *expr() {
+    Node *node = mul();
+
+    for (;;) {
+        if (consume('+'))
+            node = new_node('+', node, mul());
+        else if (consume('-'))
+            node = new_node('-', node, mul());
+        else
+            return node;
+    }
+}
+
+// mulのパーサ
+Node *mul() {
     Token *num;
     if ((num = consume(TK_NUM)) == NULL)
         error_at(tokens[pos].input, "数でありません");
@@ -131,10 +147,8 @@ Node *expr() {
     Node *node = new_node_num(num->val);
 
     for (;;) {
-        if (consume('+'))
-            node = new_node('+', node, expr());
-        else if (consume('-'))
-            node = new_node('-', node, expr());
+        if (consume('*'))
+            node = new_node('*', node, expr());
         else
             return node;
     }
@@ -159,6 +173,9 @@ void gen(Node *node) {
         break;
     case '-':
         printf("  sub rax, rdi\n");
+        break;
+    case '*':
+        printf("  imul rdi\n");
         break;
     default:
         error("知らないノード種別: %d\n", node->ty);
