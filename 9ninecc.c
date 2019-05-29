@@ -99,7 +99,7 @@ void tokenize() {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*') {
+        if (*p == '+' || *p == '-' || *p == '*' || *p == '/') {
             tokens[i].ty = *p;
             tokens[i].input = p;
             i++;
@@ -149,6 +149,8 @@ Node *mul() {
     for (;;) {
         if (consume('*'))
             node = new_node('*', node, expr());
+        else if (consume('/'))
+            node = new_node('/', node, expr());
         else
             return node;
     }
@@ -176,6 +178,10 @@ void gen(Node *node) {
         break;
     case '*':
         printf("  imul rdi\n");
+        break;
+    case '/':
+        printf("  cqo\n");
+        printf("  idiv rdi\n");
         break;
     default:
         error("知らないノード種別: %d\n", node->ty);
