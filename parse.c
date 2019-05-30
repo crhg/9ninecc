@@ -59,19 +59,33 @@ Node *term() {
     if ((token = consume(TK_NUM)) != NULL)
         return new_node_num(token->val);
 
-    if ((token = consume(TK_IDENT)) != NULL)
+    if ((token = consume(TK_IDENT)) != NULL) {
         if (!consume('(')) {
             // ただの変数参照
             return new_node_ident(token->name);
         } else {
             // カッコがあれば関数呼び出し
+            Node *node = new_node(ND_CALL, NULL, NULL);
+            Vector *params = new_vector();
+            node->name = token->name;
+            node->params = params;
+
+            if (consume(')')) {
+               return node;
+            }
+
+            vec_push(params, expr());
+
+            while (consume(',')) {
+                vec_push(params, expr());
+            }
+
             if (!consume(')'))
                 error_at(TOKEN(pos)->input, "閉じカッコがありません");
 
-            Node *node = new_node(ND_CALL, NULL, NULL);
-            node->name = token->name;
             return node;
         }
+    }
 
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }

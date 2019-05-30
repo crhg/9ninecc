@@ -68,10 +68,11 @@ typedef struct Node {
     struct Node *else_stmt; // ND_IFのときのelse文
     struct Node *init; // ND_FORのときの１つ目の式
     struct Node *next; // ND_FORのときの３つ目の式
-    Vector *stmts; // ND_BLOCKの時のstmtのベクタ
-    int val;   // tyがND_NUMの場合のみ使う
-    int offset; // tyがND_IDENTの場合のみ使う
-    char *name; // tyがND_CALLの時に使う識別子名
+    Vector *stmts;     // ND_BLOCKの時のstmtのベクタ
+    int val;           // tyがND_NUMの場合のみ使う
+    int offset;        // tyがND_IDENTの場合のみ使う
+    char *name;        // tyがND_CALLの時に使う識別子名
+    Vector *params;    // tyがND_CALLの時に使うパラメタの式のベクタ
 } Node;
 
 // 2項演算子のノードを作る

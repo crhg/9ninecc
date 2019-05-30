@@ -32,19 +32,22 @@ void stack_pop(int size) {
 // 関数呼び出し前にスタックが16バイト境界になるように調整する
 // callが戻り番地を8バイト積むのでその分も考慮
 // 調整量を返す
-int adjust_stack() {
-    int adjust = 16 - (stack_ptr + 8) % 16;
+// param_stack_sizeはスタック渡しするパラメタのサイズ合計
+int adjust_stack(int param_stack_size) {
+    int adjust = 16 - (stack_ptr + param_stack_size + 8) % 16;
     if (adjust != 0) {
         printf("  sub rsp, %d\n", adjust);
+        stack_push(adjust);
     }
     return adjust;;
 }
 
-// スタック調整の回復
-// adjustは調整量
-void restore_adjusted_stack(int adjust) {
-    if (adjust != 0) {
-        printf("  add rsp, %d\n", adjust);
+// 関数呼び出し後のスタックの回復
+// sizeはスタック調整量+スタック渡しのパラメタのサイズ合計
+void restore_stack(int size) {
+    if (size != 0) {
+        printf("  add rsp, %d\n", size);
+        stack_pop(size);
     }
 }
 
@@ -68,9 +71,51 @@ void gen(Node *node) {
 
     if (node->ty == ND_CALL) {
         // 関数呼び出し
-        int adjusted = adjust_stack();
+
+        // スタック渡しするパラメタのサイズを計算
+        int param_stack_size = (node->params->len > 6)? (node->params->len - 6) * 8: 0;
+
+        // スタックのアラインメント調整
+        int adjusted = adjust_stack(param_stack_size);
+
+        // パラメタを計算(右から左)
+        for (int i = node->params->len - 1; i >= 0; i--) {
+            gen(node->params->data[i]);
+        }
+
+        // レジスタ渡しするパラメタの処理
+        if (node->params->len >= 1) {
+            printf("  pop rdi\n");
+            stack_pop(8);
+        }
+        if (node->params->len >= 2) {
+            printf("  pop rsi\n");
+            stack_pop(8);
+        }
+        if (node->params->len >= 3) {
+            printf("  pop rdx\n");
+            stack_pop(8);
+        }
+        if (node->params->len >= 4) {
+            printf("  pop rcx\n");
+            stack_pop(8);
+        }
+        if (node->params->len >= 5) {
+            printf("  pop r8\n");
+            stack_pop(8);
+        }
+        if (node->params->len >= 6) {
+            printf("  pop r9\n");
+            stack_pop(8);
+        }
+
+        // 呼び出し
         printf("  call %s\n", node->name);
-        restore_adjusted_stack(adjusted);
+
+        // スタック回復
+        restore_stack(adjusted + param_stack_size);
+
+        // 戻り値をスタックに積む
         printf("  push rax\n");
         stack_push(8);
         return;

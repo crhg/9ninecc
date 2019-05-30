@@ -77,6 +77,7 @@ try 0 "for(a=0; a != 9999999; a=a+1) return 0;"
 try 3 "{a=1; a=a+2; return a;}"
 try_output OK "foo();" test_source/test1.c
 try 45 "return 1+foo()+2;" test_source/test2.c
+try_output 1-2-3-4-5-6-7-8 "foo(1,2,3,4,5,6,7,8);" test_source/test3.c
 
 echo OK
 
