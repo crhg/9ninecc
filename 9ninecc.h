@@ -52,6 +52,7 @@ enum {
     ND_FOR,
     ND_EXPR,      // <式>; 文
     ND_BLOCK,
+    ND_CALL,      // 関数呼び出し
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -70,6 +71,7 @@ typedef struct Node {
     Vector *stmts; // ND_BLOCKの時のstmtのベクタ
     int val;   // tyがND_NUMの場合のみ使う
     int offset; // tyがND_IDENTの場合のみ使う
+    char *name; // tyがND_CALLの時に使う識別子名
 } Node;
 
 // 2項演算子のノードを作る

@@ -60,7 +60,18 @@ Node *term() {
         return new_node_num(token->val);
 
     if ((token = consume(TK_IDENT)) != NULL)
-        return new_node_ident(token->name);
+        if (!consume('(')) {
+            // ただの変数参照
+            return new_node_ident(token->name);
+        } else {
+            // カッコがあれば関数呼び出し
+            if (!consume(')'))
+                error_at(TOKEN(pos)->input, "閉じカッコがありません");
+
+            Node *node = new_node(ND_CALL, NULL, NULL);
+            node->name = token->name;
+            return node;
+        }
 
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }

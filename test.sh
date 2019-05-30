@@ -3,11 +3,29 @@
 try() {
     expected="$1"
     input="$2"
+    shift 2
 
     ./9ninecc "$input" > tmp.s
-    gcc -o tmp tmp.s
+    gcc -o tmp tmp.s "$@"
     ./tmp
     actual="$?"
+
+    if [ "$actual" = "$expected" ]; then
+        echo "$input => $actual"
+    else
+        echo "$expected expected, but got $actual"
+        exit 1
+    fi
+}
+
+try_output() {
+    expected="$1"
+    input="$2"
+    shift 2
+
+    ./9ninecc "$input" > tmp.s
+    gcc -o tmp tmp.s "$@"
+    actual=$(./tmp)
 
     if [ "$actual" = "$expected" ]; then
         echo "$input => $actual"
@@ -57,6 +75,8 @@ try 0 "a=0;while(a != 9999999) a=a+1; return 0;"
 try 50 "b=0;for(a=0;a<5;a=a+1) b=b+10; return b;"
 try 0 "for(a=0; a != 9999999; a=a+1) return 0;"
 try 3 "{a=1; a=a+2; return a;}"
+try_output OK "foo();" test_source/test1.c
+try 45 "return 1+foo()+2;" test_source/test2.c
 
 echo OK
 

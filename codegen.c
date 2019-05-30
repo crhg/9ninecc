@@ -15,6 +15,39 @@ void gen_lval(Node *node) {
     printf("  push rax\n");
 }
 
+// スタック位置
+int stack_ptr = 0;
+
+// スタックにsizeバイトをpushしたことを記録する
+void stack_push(int size) {
+    stack_ptr += size;
+}
+
+// スタックにsizeバイトをpopしたことを記録する
+void stack_pop(int size) {
+    stack_ptr -= size;
+}
+
+// スタック調整
+// 関数呼び出し前にスタックが16バイト境界になるように調整する
+// callが戻り番地を8バイト積むのでその分も考慮
+// 調整量を返す
+int adjust_stack() {
+    int adjust = 16 - (stack_ptr + 8) % 16;
+    if (adjust != 0) {
+        printf("  sub rsp, %d\n", adjust);
+    }
+    return adjust;;
+}
+
+// スタック調整の回復
+// adjustは調整量
+void restore_adjusted_stack(int adjust) {
+    if (adjust != 0) {
+        printf("  add rsp, %d\n", adjust);
+    }
+}
+
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_NUM) {
@@ -28,6 +61,15 @@ void gen(Node *node) {
         gen_lval(node);
         printf("  pop rax\n");
         printf("  mov rax, [rax]\n");
+        printf("  push rax\n");
+        return;
+    }
+
+    if (node->ty == ND_CALL) {
+        // 関数呼び出し
+        int adjusted = adjust_stack();
+        printf("  call %s\n", node->name);
+        restore_adjusted_stack(adjusted);
         printf("  push rax\n");
         return;
     }
