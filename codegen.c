@@ -52,6 +52,7 @@ void restore_adjusted_stack(int adjust) {
 void gen(Node *node) {
     if (node->ty == ND_NUM) {
         printf("  push %d\n", node->val);
+        stack_push(8);
         return;
     }
 
@@ -71,6 +72,7 @@ void gen(Node *node) {
         printf("  call %s\n", node->name);
         restore_adjusted_stack(adjusted);
         printf("  push rax\n");
+        stack_push(8);
         return;
     }
 
@@ -83,16 +85,20 @@ void gen(Node *node) {
         printf("  pop rax\n");
         printf("  mov [rax], rdi\n");
         printf("  push rdi\n"); // 全体の値は右辺の計算結果
+        stack_pop(8);
         return;
     }
 
     if (node->ty == ND_EXPR) {
+        stack_ptr = 0;
         gen(node->lhs);
         printf("  pop rax\n");
+        stack_pop(8);
         return;
     }
 
     if (node->ty == ND_RETURN) {
+        stack_ptr = 0;
         gen(node->lhs);
         printf("  pop rax\n");
         printf("  mov rsp, rbp\n");
@@ -102,6 +108,7 @@ void gen(Node *node) {
     }
 
     if (node->ty == ND_IF) {
+        stack_ptr = 0;
         printf("# if!!\n");
         gen(node->cond);
         int seq = label_seq++;
@@ -130,6 +137,7 @@ void gen(Node *node) {
         int seq = label_seq++;
 
         printf(".Lbegin%d:\n", seq);
+        stack_ptr = 0;
         gen(node->cond);
         printf("  pop rax\n");
         printf("  cmp rax, 0\n");
@@ -145,11 +153,13 @@ void gen(Node *node) {
         int seq = label_seq++;
 
         if (node->init != NULL) {
+            stack_ptr = 0;
             gen(node->init);
             printf("  pop rax\n");
         }
         printf(".Lbegin%d:\n", seq);
         if (node->cond != NULL) {
+            stack_ptr = 0;
             gen(node->cond);
             printf("  pop rax\n");
             printf("  cmp rax, 0\n");
@@ -157,6 +167,7 @@ void gen(Node *node) {
         }
         gen(node->stmt);
         if (node->next != NULL) {
+            stack_ptr = 0;
             gen(node->next);
             printf("  pop rax\n");
         }
@@ -219,4 +230,5 @@ void gen(Node *node) {
     }
 
     printf("  push rax\n");
+    stack_pop(8);
 }
