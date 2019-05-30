@@ -229,6 +229,27 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->ty == ND_FUNC) {
+        printf(".global %s\n", node->name);
+        printf("%s:\n", node->name);
+
+        // プロローグ
+        printf("  push rbp\n");
+        printf("  mov rbp, rsp\n");
+        printf("  sub rsp, %d\n", node->local_var_map->keys->len * 8);
+
+        // TODO: 引数の処理
+
+        gen(node->stmt);
+
+        // エピローグ
+        // 最後の式の結果はraxに残っているのでそれが返り値になる
+        printf("  mov rsp, rbp\n");
+        printf("  pop rbp\n");
+        printf("  ret\n");
+        return;
+    }
+
     gen(node->lhs);
     gen(node->rhs);
 

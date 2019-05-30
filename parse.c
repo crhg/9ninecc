@@ -172,6 +172,26 @@ Node *expr() {
     return assign();
 }
 
+Node *stmt();
+
+// ブロックのパーサ
+Node *block() {
+    if (!consume('{')) {
+        error_at(TOKEN(pos)->input, "'{'でないトークンです2");
+    }
+
+    Node *node = new_node(ND_BLOCK, NULL, NULL);
+    Vector *stmts = new_vector();
+    node->stmts = stmts;
+
+    while (!consume('}')) {
+        vec_push(stmts, stmt());
+    }
+
+    return node;
+}
+
+
 // 文のパーサ
 Node *stmt() {
     Node *node;
@@ -249,20 +269,9 @@ Node *stmt() {
         return node;
     }
 
-    if (consume('{')) {
-        node = new_node(ND_BLOCK, NULL, NULL);
-        Vector *stmts = new_vector();
-        node->stmts = stmts;
-
-        while (!consume('}')) {
-            vec_push(stmts, stmt());
-        }
-
-        return node;
+    if (next_token_is('{')) {
+        return block();
     }
-
-
-
 
     if (consume(TK_RETURN)) {
         node = new_node(ND_RETURN, expr(), NULL);
@@ -275,15 +284,66 @@ Node *stmt() {
     return node;
 }
 
-// プログラムを保存する配列
-Node *code[100];
+// 関数定義のパーサ
+Node *function() {
+    local_var_map = new_map();
+    Node *node = new_node(ND_FUNC, NULL, NULL);
+    node->params = new_vector();
+
+    Token *function_name;
+    if ((function_name = consume(TK_IDENT)) == NULL) {
+        error_at(TOKEN(pos)->input, "識別子でないトークンです");
+    }
+
+    node->name = function_name->name;
+
+    if (!consume('(')) {
+        error_at(TOKEN(pos)->input, "'('でないトークンです");
+    }
+
+    if (consume(')')) {
+        // 引数無し
+    } else {
+        Token *param;
+
+        if ((param = consume(TK_IDENT)) == NULL) {
+            error_at(TOKEN(pos)->input, "識別子でないトークンです");
+        }
+
+        // TODO: パラメタ名の重複チェック
+        vec_push(node->params, new_node_ident(param->name));
+
+        while (consume(',')) {
+            if ((param = consume(TK_IDENT)) == NULL) {
+                error_at(TOKEN(pos)->input, "識別子でないトークンです");
+            }
+
+            vec_push(node->params, new_node_ident(param->name));
+        }
+
+        if (!consume(')')) {
+            error_at(TOKEN(pos)->input, "')'でないトークンです");
+        }
+    }
+
+    if (!next_token_is('{')) {
+        error_at(TOKEN(pos)->input, "'{'でないトークンです1");
+    }
+
+    node->stmt = block();
+    node->local_var_map = local_var_map;
+
+    return node;
+}
+
+// 関数定義のベクター
+Vector *functions;
 
 // プログラムのパーサ
 void program() {
-    local_var_map = new_map();
+    functions = new_vector();
 
-    int i = 0;
-    while (TOKEN(pos)->ty != TK_EOF)
-        code[i++] = stmt();
-    code[i] = NULL;
+    while (TOKEN(pos)->ty != TK_EOF) {
+        vec_push(functions, function());
+    }
 }

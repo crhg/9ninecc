@@ -53,6 +53,7 @@ enum {
     ND_EXPR,      // <式>; 文
     ND_BLOCK,
     ND_CALL,      // 関数呼び出し
+    ND_FUNC,      // 関数定義
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -73,6 +74,7 @@ typedef struct Node {
     int offset;        // tyがND_IDENTの場合のみ使う
     char *name;        // tyがND_CALLの時に使う識別子名
     Vector *params;    // tyがND_CALLの時に使うパラメタの式のベクタ
+    Map *local_var_map; // 関数定義のローカル変数マップ
 } Node;
 
 // 2項演算子のノードを作る
@@ -98,6 +100,8 @@ extern int pos;
 // それ以外はNULLを返す
 Token *consume(int ty);
 
+int next_token_is(int ty);
+
 // エラーを報告するための関数
 // printfと同じ引数を取る
 _Noreturn void error(char *fmt, ...);
@@ -111,7 +115,7 @@ void tokenize();
 
 // パーサ
 void program();
-extern Node *code[];
+extern Vector *functions;
 extern Map *local_var_map;
 int get_local_var_offset(char *name);
 

@@ -23,6 +23,11 @@ Token *consume(int ty) {
     return TOKEN(pos++);
 }
 
+// 次のトークンが期待した値か調べます
+int next_token_is(int ty) {
+    return TOKEN(pos)->ty == ty;
+}
+
 // ポインタで示されたところから名前の長さを求める
 size_t name_length(char *p) {
     size_t r = 0;
