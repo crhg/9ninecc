@@ -69,6 +69,12 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->ty == ND_VAR) {
+        // 変数定義
+        // 今のところ何もしない
+        return;
+    }
+
     if (node->ty == ND_CALL) {
         // 関数呼び出し
 
@@ -238,7 +244,36 @@ void gen(Node *node) {
         printf("  mov rbp, rsp\n");
         printf("  sub rsp, %d\n", node->local_var_map->keys->len * 8);
 
-        // TODO: 引数の処理
+        // rbp + 0: 以前のrbp
+        // rbp + 8: 戻り番地
+        // rbp + 16: 第7引数
+        // rbp + 24: 第8引数
+        // ...
+
+        // 引数の値をローカル変数にコピーする
+        for (int i = 0; i < node->params->len; i++) {
+            // XXX: とりあえずr10は使って良さそうなので使ってみたが...
+            printf("  mov r10, rbp\n");
+            printf("  sub r10, %d\n", ((Node *)node->params->data[i])->offset);
+            if (i == 0) {
+                printf("  mov [r10], rdi\n");
+            } else if (i == 1) {
+                printf("  mov [r10], rsi\n");
+            } else if (i == 2) {
+                printf("  mov [r10], rdx\n");
+            } else if (i == 3) {
+                printf("  mov [r10], rcx\n");
+            } else if (i == 4) {
+                printf("  mov [r10], r8\n");
+            } else if (i == 5) {
+                printf("  mov [r10], r9\n");
+            } else {
+                printf("  mov rax, rbp\n");
+                printf("  add rax, %d\n", (i-6) * 8 + 16);
+                printf("  mov rax, [rax]\n");
+                printf("  mov [r10], rax\n");
+            }
+        }
 
         gen(node->stmt);
 

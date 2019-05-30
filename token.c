@@ -183,6 +183,12 @@ void tokenize() {
             continue;
         }
 
+        if (keyword(p, &np, "int")) {
+            push_token(TK_INT, p);
+            p = np;
+            continue;
+        }
+
 
         if (isdigit(*p)) {
             Token *num_token = push_token(TK_NUM, p);

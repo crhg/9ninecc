@@ -4,19 +4,19 @@
 // ローカル変数のマップ
 Map *local_var_map;
 
+// ローカル変数を新しく登録する
+// オフセットを返す(オフセットは0にはならないことに注意)
+int new_local_var_offset(char *name) {
+    int offset = (local_var_map->keys->len +1 ) * 8;
+    map_put(local_var_map, name, (void*)offset);
+
+    return offset;
+}
+
 // ローカル変数のオフセットを取得する
-// マップに未登録なら登録する。
+// マップに未登録なら0を返す(有効なオフセットは0ではない)
 int get_local_var_offset(char *name) {
-    int *offset_p = map_get(local_var_map, name);
-    if (offset_p != NULL) {
-        return *offset_p;
-    }
-
-    offset_p = malloc(sizeof(int));
-    *offset_p = local_var_map->keys->len * 8;
-    map_put(local_var_map, name, offset_p);
-
-    return *offset_p;
+    return (int)map_get(local_var_map, name);
 }
 
 // ノードを作る
@@ -37,10 +37,25 @@ Node *new_node_num(int val) {
 }
 
 // 識別子のノードを作る
-Node *new_node_ident(char *name) {
+Node *new_node_ident(Token *token) {
+    int offset = get_local_var_offset(token->name);
+    if (offset == 0) {
+        error_at(token->input, "未定義の変数です");
+    }
+
     Node *node = malloc(sizeof(Node));
     node->ty = ND_IDENT;
-    node->offset = get_local_var_offset(name);
+    node->offset = offset;
+    return node;
+}
+
+// 変数定義のノードを作る
+Node *new_node_var(Token *token) {
+    int offset = new_local_var_offset(token->name);
+
+    Node *node = malloc(sizeof(Node));
+    node->ty = ND_VAR;
+    node->offset = offset;
     return node;
 }
 
@@ -62,7 +77,7 @@ Node *term() {
     if ((token = consume(TK_IDENT)) != NULL) {
         if (!consume('(')) {
             // ただの変数参照
-            return new_node_ident(token->name);
+            return new_node_ident(token);
         } else {
             // カッコがあれば関数呼び出し
             Node *node = new_node(ND_CALL, NULL, NULL);
@@ -269,6 +284,19 @@ Node *stmt() {
         return node;
     }
 
+    if (consume(TK_INT)) {
+        // 変数定義
+        Token *id;
+        if ((id = consume(TK_IDENT)) == NULL) {
+            error_at(TOKEN(pos)->input, "'識別子'ではないトークンです");
+        }
+        if (!consume(';')) {
+            error_at(TOKEN(pos)->input, "';'ではないトークンです");
+        }
+
+        return new_node_var(id);
+    }
+
     if (next_token_is('{')) {
         return block();
     }
@@ -290,6 +318,10 @@ Node *function() {
     Node *node = new_node(ND_FUNC, NULL, NULL);
     node->params = new_vector();
 
+    if (!consume(TK_INT)) {
+        error_at(TOKEN(pos)->input, "intでないトークンです");
+    }
+
     Token *function_name;
     if ((function_name = consume(TK_IDENT)) == NULL) {
         error_at(TOKEN(pos)->input, "識別子でないトークンです");
@@ -306,19 +338,28 @@ Node *function() {
     } else {
         Token *param;
 
+        if (!consume(TK_INT)) {
+            error_at(TOKEN(pos)->input, "intでないトークンです");
+        }
+
+
         if ((param = consume(TK_IDENT)) == NULL) {
             error_at(TOKEN(pos)->input, "識別子でないトークンです");
         }
 
         // TODO: パラメタ名の重複チェック
-        vec_push(node->params, new_node_ident(param->name));
+        vec_push(node->params, new_node_var(param));
 
         while (consume(',')) {
+            if (!consume(TK_INT)) {
+                error_at(TOKEN(pos)->input, "intでないトークンです");
+            }
+
             if ((param = consume(TK_IDENT)) == NULL) {
                 error_at(TOKEN(pos)->input, "識別子でないトークンです");
             }
 
-            vec_push(node->params, new_node_ident(param->name));
+            vec_push(node->params, new_node_var(param));
         }
 
         if (!consume(')')) {

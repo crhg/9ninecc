@@ -28,6 +28,7 @@ enum {
     TK_ELSE,
     TK_WHILE,
     TK_FOR,
+    TK_INT,
     TK_EQ,        // ==
     TK_NE,        // !=
     TK_LE,        // <=
@@ -54,6 +55,7 @@ enum {
     ND_BLOCK,
     ND_CALL,      // 関数呼び出し
     ND_FUNC,      // 関数定義
+    ND_VAR,       // 変数定義
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -118,6 +120,7 @@ void program();
 extern Vector *functions;
 extern Map *local_var_map;
 int get_local_var_offset(char *name);
+int new_local_var_offset(char *name);
 
 // コード生成
 void gen(Node *node);
