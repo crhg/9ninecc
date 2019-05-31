@@ -209,11 +209,25 @@ Node *block() {
     return node;
 }
 
+//- <local_var_def> ::= int IDENT
+Node *local_var_def() {
+        // 変数定義
+        Token *id;
+        if (!consume(TK_INT)) {
+            error_at(TOKEN(pos)->input, "intではないトークンです");
+        }
+        if ((id = consume(TK_IDENT)) == NULL) {
+            error_at(TOKEN(pos)->input, "'識別子'ではないトークンです");
+        }
+
+        return new_node_var(id);
+    }
+
 //- <stmt> ::=
 //-      if '(' <expr> ')' <stmt> (else <stmt>)?
 //-    | while '(' <expr> ')' <stmt>
 //-    | for '(' <expr>? ';' <expr>? ';' <expr>? ')' <stmt>
-//-    | int IDENT ';'
+//-    | <local_var_def> ';'
 //-    | <block>
 //-    | return <expr> ';'
 //-    | <expr> ';'
@@ -293,17 +307,12 @@ Node *stmt() {
         return node;
     }
 
-    if (consume(TK_INT)) {
-        // 変数定義
-        Token *id;
-        if ((id = consume(TK_IDENT)) == NULL) {
-            error_at(TOKEN(pos)->input, "'識別子'ではないトークンです");
-        }
+    if (next_token_is(TK_INT)) {
+        node = local_var_def();
         if (!consume(';')) {
             error_at(TOKEN(pos)->input, "';'ではないトークンです");
         }
-
-        return new_node_var(id);
+        return node;
     }
 
     if (next_token_is('{')) {
@@ -321,7 +330,7 @@ Node *stmt() {
     return node;
 }
 
-//- <function> ::= int IDENT '(' (int IDENT (',' int IDENT)*)? ')' <block>
+//- <function> ::= int IDENT '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
 Node *function() {
     local_var_map = new_map();
     Node *node = new_node(ND_FUNC, NULL, NULL);
@@ -345,30 +354,10 @@ Node *function() {
     if (consume(')')) {
         // 引数無し
     } else {
-        Token *param;
-
-        if (!consume(TK_INT)) {
-            error_at(TOKEN(pos)->input, "intでないトークンです");
-        }
-
-
-        if ((param = consume(TK_IDENT)) == NULL) {
-            error_at(TOKEN(pos)->input, "識別子でないトークンです");
-        }
-
-        // TODO: パラメタ名の重複チェック
-        vec_push(node->params, new_node_var(param));
+        vec_push(node->params, local_var_def());
 
         while (consume(',')) {
-            if (!consume(TK_INT)) {
-                error_at(TOKEN(pos)->input, "intでないトークンです");
-            }
-
-            if ((param = consume(TK_IDENT)) == NULL) {
-                error_at(TOKEN(pos)->input, "識別子でないトークンです");
-            }
-
-            vec_push(node->params, new_node_var(param));
+            vec_push(node->params, local_var_def());
         }
 
         if (!consume(')')) {
