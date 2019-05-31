@@ -1,0 +1,116 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "9ninecc.h"
+
+Type int_type = { INT };
+
+// ポインタの型
+Type *pointer_of(Type *type) {
+    Type *ret = malloc(sizeof(Type));
+    ret->ty = PTR;
+    ret->ptrof = type;
+    return ret;
+}
+
+Type *assign_type_to_lval(Node *node);
+
+// 式に型をつける
+Type *assign_type_to_expr(Node *node) {
+    Type *type;
+    Type *lval_type;
+    Type *ltype;
+    Type *rtype;
+
+    // 左辺値として型がつけられたらそのまま返す
+    lval_type = assign_type_to_lval(node);
+    if (lval_type) { return lval_type; }
+
+    // あとは右辺値
+    switch (node->ty) {
+        case ND_CALL:
+            // TODO: 関数の型 いまのところ決め打ちでint
+            node->type = &int_type;
+            for (int i = 0; i < node->params->len; i++) {
+                assign_type_to_expr((Node *)node->params->data[i]);
+                // TODO: パラメタの型チェック
+            }
+            return &int_type;
+        case ND_PTR_OF:
+            type = assign_type_to_lval(node->ptrof);
+            return node->type = pointer_of(type);
+        case '=':
+            lval_type = assign_type_to_lval(node->lhs);
+            if (lval_type == NULL) {
+                // TODO: エラー発生位置を表示したい
+                error("代入先が左辺値でありません");
+            }
+            type = assign_type_to_expr(node->rhs);
+            return type;
+        case '+':
+            // ポインタ+整数はポインタ型になる
+            ltype = assign_type_to_expr(node->lhs);
+            rtype = assign_type_to_expr(node->rhs);
+            if (ltype->ty == PTR && rtype->ty == INT) {
+                return ltype;
+            }
+            if (rtype->ty == PTR && ltype->ty == INT) {
+                return rtype;
+            }
+            if (rtype->ty == PTR && ltype->ty == PTR) {
+                error("ポインタ同士の加算はできません");
+            }
+            return node->type = &int_type;
+        case '-':
+            // ポインタ-整数はポインタ型になる
+            ltype = assign_type_to_expr(node->lhs);
+            rtype = assign_type_to_expr(node->rhs);
+            if (ltype->ty == PTR && rtype->ty == INT) {
+                return ltype;
+            }
+            if (ltype->ty == INT && rtype->ty == PTR) {
+                error("整数からポインタは引けません");
+            }
+            if (rtype->ty == PTR && ltype->ty == PTR) {
+                // TODO: ポインタの引き算はあったような気がする
+                error("ポインタ同士の減算はできません");
+            }
+            return node->type = &int_type;
+        case '*':
+        case '/':
+        case ND_EQ:
+        case ND_NE:
+        case '<':
+        case ND_LE:
+            assign_type_to_expr(node->lhs);
+            assign_type_to_expr(node->rhs);
+            return node->type = &int_type;
+        case ND_NUM:
+            return node->type = &int_type;
+        default:
+            error_at_node(node, "unexpected node: %d", node->ty);
+    }
+}
+
+// 左辺値に型をつける
+// 左辺値でなければNULL
+Type *assign_type_to_lval(Node *node) {
+    Type *type;
+    switch (node->ty) {
+        case ND_LOCAL_VAR:
+            return node->type = node->local_var->type;
+        case ND_PTR:
+            /* print_node_pos(node); */
+            /* fprintf(stderr, "assign type ND_PTR\n"); */
+            type = assign_type_to_expr(node->ptrto);
+            if (type->ty != PTR) {
+                error_at_node(node->ptrto, "ポインタ型ではありません");
+            }
+            if (type->ptrof == NULL) {
+                error_at_node(node->ptrto, "不明なポインタ型");
+            }
+            return node->type = type->ptrof;
+        default:
+            return NULL;
+    }
+}
+

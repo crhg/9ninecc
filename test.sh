@@ -97,6 +97,9 @@ try 45 "return 1+foo()+2;" test_source/test2.c
 try_output 1-2-3-4-5-6-7-8 "foo(1,2,3,4,5,6,7,8);" test_source/test3.c
 try_output_raw "5" "int main(){pr_int(add(2,3));} int add(int a,int b){return a+b;}" test_source/print.c
 try_output_raw "6765" "int main(){pr_int(fib(20));} int fib(int n){if(n <= 2)return 1;else return fib(n-1)+fib(n-2);}" test_source/print.c
+try_output_raw 3 'int main() { int x; x = 3; int *y; pr_int(3);}' test_source/print.c
+try_output_raw 3 'int main() { int x; x = 3; int *y; y = &x; int z; z = *y; pr_int(z);}' test_source/print.c
+try_output_raw 3 'int main() { int x; x = 3; int *y; y = &x; pr_int(*y); }' test_source/print.c
 
 echo OK
 

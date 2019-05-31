@@ -10,11 +10,14 @@
 void error(char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    vfprintf(stderr, fmt, ap);
+    verror(fmt, ap);
+}
+
+void verror(char *fmt, va_list args) {
+    vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
     exit(1);
 }
-
 
 int main(int argc, char **argv) {
     if (argc != 2) {

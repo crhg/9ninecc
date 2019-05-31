@@ -4,16 +4,6 @@
 // ラベル番号
 int label_seq = 0;
 
-// 左辺値のコード生成
-// アドレスをスタックトップにプッシュする
-void gen_lval(Node *node) {
-    if (node->ty != ND_IDENT)
-        error("代入の左辺値が変数ではありません");
-
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n", node->offset);
-    printf("  push rax\n");
-}
 
 // スタック位置
 int stack_ptr = 0;
@@ -51,6 +41,60 @@ void restore_stack(int size) {
     }
 }
 
+typedef enum Reg { RAX, RDI, RSI, RDX, RCX, RBP, RSP, RBX, R8, R9, R10, R11, R12, R13, R14, R15 } Reg;
+typedef enum RegSize { SIZE64, SIZE32, SIZE16, SIZE8 } RegSize;
+
+char *reg_table[][4] = {
+    {"rax", "eax", "ax", "al"},
+    {"rdi", "edi", "di", "dil"},
+    {"rsi", "esi", "si", "sil"},
+    {"rdx", "edx", "dx", "dl"},
+    {"rcx", "ecx", "cx", "cl"},
+    {"rbp", "ebp", "bp", "bpl"},
+    {"rsp", "esp", "sp", "spl"},
+    {"rbx", "ebx", "bx", "bl"},
+    {"r8", "r8d", "r8w", "r8b"}, 
+    {"r9", "r9d", "r9w", "r9b"}, 
+    {"r10", "r10d", "r10w", "r10b"}, 
+    {"r11", "r11d", "r11w", "r11b"}, 
+    {"r12", "r12d", "r12w", "r12b"}, 
+    {"r13", "r13d", "r13w", "r13b"}, 
+    {"r14", "r14d", "r14w", "r14b"}, 
+    {"r15", "r15d", "r15w", "r15b"}, 
+};
+
+// レジスタ名の選択
+char * select_reg(int ty, Reg reg) {
+    RegSize reg_size;
+    switch (ty) {
+        case PTR:
+            reg_size = SIZE64;
+            break;
+        case INT:
+            reg_size = SIZE32;
+            break;
+        default:
+            error("不明な型: %d", ty);
+    }
+
+    return reg_table[reg][reg_size];
+}
+
+// 左辺値のコード生成
+// アドレスをスタックトップにプッシュする
+// 型を返す
+int  gen_lval(Node *node) {
+    if (node->ty != ND_LOCAL_VAR)
+        error_at_node(node, "代入の左辺値が変数ではありません");
+
+    printf("  mov rax, rbp\n");
+    printf("  sub rax, %d\n", node->local_var->offset);
+    printf("  push rax\n");
+    stack_push(8);
+
+    return node->local_var->type->ty;
+}
+
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_NUM) {
@@ -59,19 +103,58 @@ void gen(Node *node) {
         return;
     }
 
-    if (node->ty == ND_IDENT) {
+    if (node->ty == ND_LOCAL_VAR) {
         // 変数の読み出し
         // アドレスを求めて間接参照で読み出す
         gen_lval(node);
         printf("  pop rax\n");
-        printf("  mov rax, [rax]\n");
+        switch (node->local_var->type->ty) {
+            case INT:
+                printf("  mov eax, [rax]\n");
+                break;
+            case PTR:
+                printf("  mov rax, [rax]\n");
+                break;
+            default:
+                error_at_node(node, "unknown type(codegen): %d", node->local_var->type->ty);
+        }
         printf("  push rax\n");
         return;
     }
 
-    if (node->ty == ND_VAR) {
+    if (node->ty == ND_LOCAL_VAR_DEF) {
         // 変数定義
         // 今のところ何もしない
+        return;
+    }
+
+    if (node->ty == ND_PTR) {
+        printf("# ND_PTR\n");
+        gen(node->ptrto);
+        printf("# ND_PTR: ptrto compiled\n");
+        printf("  pop rax\n");
+        if (node->type == NULL) {
+            error_at_node(node, "ND_PTR: type is NULL\n");
+        }
+
+        switch (node->type->ty) {
+            case INT:
+                printf("  mov eax, [rax]\n");
+                break;
+            case PTR:
+                printf("  mov rax, [rax]\n");
+                break;
+            default:
+                error_at_node(node, "unknown type at ND_PTR: %d\n", node->type->ty);
+        }
+        printf("  push rax\n");
+
+        // popしてpushなのでスタック増減はない
+        return;
+    }
+
+    if (node->ty == ND_PTR_OF) {
+        gen_lval(node->ptrof);
         return;
     }
 
@@ -129,12 +212,23 @@ void gen(Node *node) {
 
     if (node->ty == '=') {
         // 代入
-        gen_lval(node->lhs);
+        int ty = gen_lval(node->lhs);
         gen(node->rhs);
 
         printf("  pop rdi\n");
         printf("  pop rax\n");
-        printf("  mov [rax], rdi\n");
+
+        switch (ty) {
+            case INT:
+                printf("  mov [rax], edi\n");
+                break;
+            case PTR:
+                printf("  mov [rax], rdi\n");
+                break;
+            default:
+                error("不明な型: %d", ty);
+        }
+
         printf("  push rdi\n"); // 全体の値は右辺の計算結果
         stack_pop(8);
         return;
@@ -253,26 +347,30 @@ void gen(Node *node) {
         // 引数の値をローカル変数にコピーする
         for (int i = 0; i < node->params->len; i++) {
             // XXX: とりあえずr10は使って良さそうなので使ってみたが...
+            LocalVar *param = ((Node *)node->params->data[i])->local_var;
+            int ty = param->type->ty;
             printf("  mov r10, rbp\n");
-            printf("  sub r10, %d\n", ((Node *)node->params->data[i])->offset);
+            printf("  sub r10, %d\n", param->offset);
+            Reg reg;
             if (i == 0) {
-                printf("  mov [r10], rdi\n");
+                reg = RDI;
             } else if (i == 1) {
-                printf("  mov [r10], rsi\n");
+                reg = RSI;
             } else if (i == 2) {
-                printf("  mov [r10], rdx\n");
+                reg = RDX;
             } else if (i == 3) {
-                printf("  mov [r10], rcx\n");
+                reg = RCX;
             } else if (i == 4) {
-                printf("  mov [r10], r8\n");
+                reg = R8;
             } else if (i == 5) {
-                printf("  mov [r10], r9\n");
+                reg = R9;
             } else {
                 printf("  mov rax, rbp\n");
                 printf("  add rax, %d\n", (i-6) * 8 + 16);
                 printf("  mov rax, [rax]\n");
-                printf("  mov [r10], rax\n");
+                reg = RAX;
             }
+            printf("  mov [r10], %s\n", select_reg(ty, reg));
         }
 
         gen(node->stmt);
@@ -283,6 +381,11 @@ void gen(Node *node) {
         printf("  pop rbp\n");
         printf("  ret\n");
         return;
+    }
+
+    // 以下2項演算子
+    if (node->lhs == NULL || node->rhs == NULL) {
+        error("たぶん2項演算子ではないノード: %d", node->ty);
     }
 
     gen(node->lhs);

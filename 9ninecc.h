@@ -1,3 +1,5 @@
+#include <stdarg.h>
+
 // 可変長ベクタ
 typedef struct {
     void **data;
@@ -43,10 +45,30 @@ typedef struct {
     char *input; //トークン文字列(エラーメッセージ用)
 } Token;
 
+// ID種別
+typedef enum IdType {
+    ID_LOCAL_VAR,
+} IdType;
+
+// 型
+typedef struct Type {
+    enum { INT, PTR } ty;
+    struct Type *ptrof;
+} Type;
+
+// ローカル変数
+typedef struct LocalVar {
+    Type *type;
+    int offset;
+} LocalVar;
+
 // ノードの型を表す値
 enum {
     ND_NUM = 256, // 整数のノードの型
     ND_IDENT,     // 識別子
+    ND_LOCAL_VAR,
+    ND_PTR,
+    ND_PTR_OF,
     ND_RETURN,    // return
     ND_IF,
     ND_WHILE,
@@ -55,7 +77,7 @@ enum {
     ND_BLOCK,
     ND_CALL,      // 関数呼び出し
     ND_FUNC,      // 関数定義
-    ND_VAR,       // 変数定義
+    ND_LOCAL_VAR_DEF,
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
@@ -64,6 +86,7 @@ enum {
 // ノードの型
 typedef struct Node {
     int ty;
+    Token *token;      // 位置表示のためのトークン
     struct Node *lhs;
     struct Node *rhs;
     struct Node *cond; // ND_IF, ND_WHILE, ND_FORのときの条件式
@@ -73,17 +96,14 @@ typedef struct Node {
     struct Node *next; // ND_FORのときの３つ目の式
     Vector *stmts;     // ND_BLOCKの時のstmtのベクタ
     int val;           // tyがND_NUMの場合のみ使う
-    int offset;        // tyがND_IDENTの場合のみ使う
+    LocalVar *local_var;
     char *name;        // tyがND_CALLの時に使う識別子名
     Vector *params;    // tyがND_CALLの時に使うパラメタの式のベクタ
     Map *local_var_map; // 関数定義のローカル変数マップ
+    struct Node *ptrto;       // tyがND_PTRの時に使う
+    struct Node *ptrof;       // tyがND_PTR_OFの時に使う
+    Type *type;        // 式であるときその値の型
 } Node;
-
-// 2項演算子のノードを作る
-Node *new_node(int ty, Node *lhs, Node *rhs);
-
-// 数値のノードを作る
-Node *new_node_num(int val);
 
 // 入力プログラム
 extern char *user_input;
@@ -107,18 +127,33 @@ int next_token_is(int ty);
 // エラーを報告するための関数
 // printfと同じ引数を取る
 _Noreturn void error(char *fmt, ...);
+_Noreturn void verror(char *fmt, va_list args);
 
 // エラー箇所を報告するための関数
-_Noreturn void error_at(char *loc, char *msg);
+_Noreturn void error_at(char *loc, char *fmt, ...);
+_Noreturn void verror_at(char *loc, char *fmt, va_list args);
+_Noreturn void error_at_token(Token *token, char *fmt, ...);
+_Noreturn void verror_at_token(Token *token, char *fmt, va_list args);
+_Noreturn void error_at_node(Node *node, char *fmt, ...);
+
+void print_loc(char *loc);
+void print_token_pos(Token *token);
+void print_node_pos(Node *node);
 
 // user_inputが指している文字列を
 // トークンに分割して保存する
 void tokenize();
 
+// 式に型をつける
+Type *assign_type_to_expr(Node *node);
+
 // パーサ
 void program();
 extern Vector *functions;
 extern Map *local_var_map;
+#define LOCAL_VAR(name) ((LocalVar *)map_get(local_var_map, name))
+#define LOCAL_VAR_AT(i) ((LocalVar *)map->vals->data[i])
+#define LOCAL_VAR_NUM (map->keys->len)
 int get_local_var_offset(char *name);
 int new_local_var_offset(char *name);
 

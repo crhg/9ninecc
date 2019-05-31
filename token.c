@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -56,15 +57,6 @@ char *dup_name(char *p, char **rp) {
     return r;
 }
 
-// エラー箇所を報告するための関数
-void error_at(char *loc, char *msg) {
-    int pos = loc - user_input;
-    fprintf(stderr, "%s\n", user_input);
-    fprintf(stderr, "%*s", pos, " ");
-    fprintf(stderr, "^ %s\n", msg);
-    exit(1);
-}
-
 Token *push_token(int ty, char *input) {
     Token *token = malloc(sizeof(Token));
     token->ty = ty;
@@ -102,6 +94,7 @@ void tokenize() {
         }
 
         if (*p == '+' || *p == '-' || *p == '*' || *p == '/'
+                || *p == '&'
                 || *p == '(' || *p == ')' || *p == ';' || *p == ','
                 || *p == '{' || *p == '}'
         ) {

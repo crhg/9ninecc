@@ -38,20 +38,9 @@ void test_map() {
     /* expect(__LINE__, 6, (long)map_get(map, "foo")); */
 }
 
-void test_local_var_map() {
-    local_var_map = new_map();
-
-    expect(__LINE__, 0, get_local_var_offset("foo"));
-    expect(__LINE__, 8, new_local_var_offset("foo"));
-    expect(__LINE__, 8, get_local_var_offset("foo"));
-}
-
-
-
 void runtest() {
     test_vector();
     test_map();
-    test_local_var_map();
 
     printf("OK\n");
 }

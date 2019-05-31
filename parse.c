@@ -1,3 +1,5 @@
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include "9ninecc.h"
 
@@ -5,26 +7,26 @@
 Map *local_var_map;
 
 // ローカル変数を新しく登録する
-// オフセットを返す(オフセットは0にはならないことに注意)
-int new_local_var_offset(char *name) {
-    int offset = (local_var_map->keys->len +1 ) * 8;
-    map_put(local_var_map, name, (void*)offset);
-
-    return offset;
+LocalVar *new_local_var(char *name) {
+    LocalVar *local_var = malloc(sizeof(LocalVar));
+    map_put(local_var_map, name, local_var);
+    return local_var;
 }
-
-// ローカル変数のオフセットを取得する
-// マップに未登録なら0を返す(有効なオフセットは0ではない)
-int get_local_var_offset(char *name) {
-    return (int)map_get(local_var_map, name);
-}
-
 // ノードを作る
-Node *new_node(int ty, Node *lhs, Node *rhs) {
+Node *new_node(int ty, Token *token) {
+    Node *node = malloc(sizeof(Node));
+    node->ty = ty;
+    node->token = token;
+    return node;
+}
+
+// 2項演算子のノードを作る
+Node *new_node_binop(int ty, Node *lhs, Node *rhs, Token *token) {
     Node *node = malloc(sizeof(Node));
     node->ty = ty;
     node->lhs = lhs;
     node->rhs = rhs;
+    node->token = token;
     return node;
 }
 
@@ -33,30 +35,22 @@ Node *new_node_num(int val) {
     Node *node = malloc(sizeof(Node));
     node->ty = ND_NUM;
     node->val = val;
+    node->token = NULL;
     return node;
 }
 
-// 識別子のノードを作る
-Node *new_node_ident(Token *token) {
-    int offset = get_local_var_offset(token->name);
-    if (offset == 0) {
-        error_at(token->input, "未定義の変数です");
+// 変数参照のノードを作る
+Node *new_node_var(Token *token) {
+    LocalVar *local_var = LOCAL_VAR(token->name);
+    if (local_var != NULL) {
+        Node *node = malloc(sizeof(Node));
+        node->ty = ND_LOCAL_VAR;
+        node->local_var = local_var;
+        node->token = token;
+        return node;
     }
 
-    Node *node = malloc(sizeof(Node));
-    node->ty = ND_IDENT;
-    node->offset = offset;
-    return node;
-}
-
-// 変数定義のノードを作る
-Node *new_node_var(Token *token) {
-    int offset = new_local_var_offset(token->name);
-
-    Node *node = malloc(sizeof(Node));
-    node->ty = ND_VAR;
-    node->offset = offset;
-    return node;
+    error_at(token->input, "未定義の変数です");
 }
 
 Node *expr();
@@ -65,7 +59,11 @@ Node *expr();
 //-     '(' <expr> ')'
 //-   | NUM
 //-   | IDENT ('(' (<expr> (',' <expr>)* )? ')' )?
+//-   | * <term>
+//-   | & <term>
 Node *term() {
+    Token *token;
+
     if (consume('(')) {
         Node *node = expr();
         if (!consume(')'))
@@ -73,17 +71,28 @@ Node *term() {
         return node;
     }
 
-    Token *token;
+    if ((token = consume('*'))) {
+        Node *node = new_node(ND_PTR, token);
+        node->ptrto = term();
+        return node;
+    }
+
+    if ((token = consume('&'))) {
+        Node *node = new_node(ND_PTR_OF, token);
+        node->ptrof = term();
+        return node;
+    }
+
     if ((token = consume(TK_NUM)) != NULL)
         return new_node_num(token->val);
 
     if ((token = consume(TK_IDENT)) != NULL) {
         if (!consume('(')) {
             // ただの変数参照
-            return new_node_ident(token);
+            return new_node_var(token);
         } else {
             // カッコがあれば関数呼び出し
-            Node *node = new_node(ND_CALL, NULL, NULL);
+            Node *node = new_node(ND_CALL, token);
             Vector *params = new_vector();
             node->name = token->name;
             node->params = params;
@@ -110,10 +119,11 @@ Node *term() {
 
 //- <unary> ::= ('+'|'-') <term>
 Node *unary() {
+    Token *token;
     if (consume('+'))
         return term();
-    if (consume('-'))
-        return new_node('-', new_node_num(0), term());
+    if ((token = consume('-')))
+        return new_node_binop('-', new_node_num(0), term(), token);
     return term();
 }
 
@@ -121,11 +131,12 @@ Node *unary() {
 Node *mul() {
     Node *node = unary();
 
+    Token *token;
     for (;;) {
-        if (consume('*'))
-            node = new_node('*', node, unary());
-        else if (consume('/'))
-            node = new_node('/', node, unary());
+        if ((token = consume('*')))
+            node = new_node_binop('*', node, unary(), token);
+        else if ((token = consume('/')))
+            node = new_node_binop('/', node, unary(), token);
         else
             return node;
     }
@@ -135,11 +146,12 @@ Node *mul() {
 Node *add() {
     Node *node = mul();
 
+    Token *token;
     for (;;) {
-        if (consume('+'))
-            node = new_node('+', node, mul());
-        else if (consume('-'))
-            node = new_node('-', node, mul());
+        if ((token = consume('+')))
+            node = new_node_binop('+', node, mul(), token);
+        else if ((token = consume('-')))
+            node = new_node_binop('-', node, mul(), token);
         else
             return node;
     }
@@ -149,15 +161,16 @@ Node *add() {
 Node *relational() {
     Node *node = add();
 
+    Token *token;
     for (;;) {
-        if (consume('<'))
-            node = new_node('<', node, add());
-        else if (consume(TK_LE))
-            node = new_node(ND_LE, node, add());
-        else if (consume('>'))
-            node = new_node('<', add(), node);
-        else if (consume(TK_GE))
-            node = new_node(ND_LE, add(), node);
+        if ((token = consume('<')))
+            node = new_node_binop('<', node, add(), token);
+        else if ((token = consume(TK_LE)))
+            node = new_node_binop(ND_LE, node, add(), token);
+        else if ((token =consume('>')))
+            node = new_node_binop('<', add(), node, token);
+        else if ((token =consume(TK_GE)))
+            node = new_node_binop(ND_LE, add(), node, token);
         else
             return node;
     }
@@ -167,11 +180,12 @@ Node *relational() {
 Node *equality() {
     Node *node = relational();
 
+    Token *token;
     for (;;) {
-        if (consume(TK_EQ))
-            node = new_node(ND_EQ, node, relational());
-        else if (consume(TK_NE))
-            node = new_node(ND_NE, node, relational());
+        if ((token = consume(TK_EQ)))
+            node = new_node_binop(ND_EQ, node, relational(), token);
+        else if ((token = consume(TK_NE)))
+            node = new_node_binop(ND_NE, node, relational(), token);
         else
             return node;
     }
@@ -180,14 +194,18 @@ Node *equality() {
 //- <assign> ::= <equality> ('=' <assign>)*
 Node *assign() {
     Node *node = equality();
-    if (consume('='))
-        node = new_node('=', node, assign());
+
+    Token *token;
+    if ((token = consume('=')))
+        node = new_node_binop('=', node, assign(), token);
     return node;
 }
 
 //- <expr> ::= <assign>
 Node *expr() {
-    return assign();
+    Node *expr = assign();
+    assign_type_to_expr(expr);
+    return expr;
 }
 
 Node *stmt();
@@ -198,7 +216,7 @@ Node *block() {
         error_at(TOKEN(pos)->input, "'{'でないトークンです2");
     }
 
-    Node *node = new_node(ND_BLOCK, NULL, NULL);
+    Node *node = new_node(ND_BLOCK, NULL);
     Vector *stmts = new_vector();
     node->stmts = stmts;
 
@@ -209,19 +227,62 @@ Node *block() {
     return node;
 }
 
-//- <local_var_def> ::= int IDENT
-Node *local_var_def() {
-        // 変数定義
-        Token *id;
-        if (!consume(TK_INT)) {
-            error_at(TOKEN(pos)->input, "intではないトークンです");
-        }
-        if ((id = consume(TK_IDENT)) == NULL) {
-            error_at(TOKEN(pos)->input, "'識別子'ではないトークンです");
-        }
+//- <ptr_ident> :: = IDENT || '*' <ptr_ident>
+Node *ptr_ident() {
+    Node *node;
 
-        return new_node_var(id);
+    Token *token;
+    if ((token = consume('*'))) {
+        node = new_node(ND_PTR, token);
+        node->ptrto = ptr_ident();
+        return node;
+    } 
+
+    Token *id;
+    if ((id = consume(TK_IDENT)) != NULL) {
+        node = new_node(ND_IDENT, id);
+        node->name = id->name;
+        return node;
     }
+
+    error_at(TOKEN(pos)->input, "'*'でも'識別子'でもないトークンです");
+}
+
+// ローカル変数を作成する
+LocalVar * create_local_var(Node *node, Type *type) {
+    if (node->ty == ND_IDENT) {
+        LocalVar *local_var = new_local_var(node->name);
+        local_var->type = type;
+        return local_var;
+    }
+
+    if (node->ty == ND_PTR) {
+        Type *new_type = malloc(sizeof(Type));
+        new_type->ty = PTR;
+        new_type->ptrof = type;
+        return create_local_var(node->ptrto, new_type);
+    }
+
+    error("IDENTでも*でもないノード");
+}
+
+//- <local_var_def> ::= int <ptr_ident>
+Node *local_var_def() {
+    // 変数定義
+    if (!consume(TK_INT)) {
+        error_at(TOKEN(pos)->input, "intではないトークンです");
+    }
+
+    Node *node_ptr_ident = ptr_ident();
+
+    Type *type = malloc(sizeof(Type));
+    type->ty = INT;
+    LocalVar *local_var = create_local_var(node_ptr_ident, type);
+
+    Node *node = new_node(ND_LOCAL_VAR_DEF, NULL);
+    node->local_var = local_var;
+    return node;
+}
 
 //- <stmt> ::=
 //-      if '(' <expr> ')' <stmt> (else <stmt>)?
@@ -235,7 +296,7 @@ Node *stmt() {
     Node *node;
 
     if (consume(TK_IF)) {
-        node = new_node(ND_IF, NULL, NULL);
+        node = new_node(ND_IF, NULL);
 
         if (!consume('('))
             error_at(TOKEN(pos)->input, "'('ではないトークンです");
@@ -257,7 +318,7 @@ Node *stmt() {
     }
 
     if (consume(TK_WHILE)) {
-        node = new_node(ND_WHILE, NULL, NULL);
+        node = new_node(ND_WHILE, NULL);
 
         if (!consume('('))
             error_at(TOKEN(pos)->input, "'('ではないトークンです");
@@ -273,7 +334,7 @@ Node *stmt() {
     }
 
     if (consume(TK_FOR)) {
-        node = new_node(ND_FOR, NULL, NULL);
+        node = new_node(ND_FOR, NULL);
 
         if (!consume('('))
             error_at(TOKEN(pos)->input, "'('ではないトークンです");
@@ -320,9 +381,9 @@ Node *stmt() {
     }
 
     if (consume(TK_RETURN)) {
-        node = new_node(ND_RETURN, expr(), NULL);
+        node = new_node_binop(ND_RETURN, expr(), NULL, NULL);
     } else {
-        node = new_node(ND_EXPR, expr(), NULL);
+        node = new_node_binop(ND_EXPR, expr(), NULL, NULL);
     }
 
     if (!consume(';'))
@@ -330,10 +391,75 @@ Node *stmt() {
     return node;
 }
 
+// 型のバイト数
+int get_size_of(int type) {
+    switch (type) {
+        case INT:
+            return 4;
+        case PTR:
+            return 8;
+        default:
+            error("unknown type(get_size_of): %d", type);
+    }
+}
+
+// マップの中のローカル変数にオフセットを割り当てる
+void allocate_local_var(Map *map) {
+    int n = LOCAL_VAR_NUM;
+
+    int offset = 0;
+    for (int i = 0; i < n; i++) {
+        LocalVar *var = LOCAL_VAR_AT(i);
+        int size = get_size_of(var->type->ty);
+
+        offset += size;
+        if (offset % size != 0) {
+            offset += (size - offset % size);
+        }
+
+        var->offset = offset;
+    }
+}
+
+void dump_type(Type *type) {
+    if (type == NULL) {
+        printf("NULL?");
+        return;
+    }
+
+    if (type->ty == INT) {
+        printf("int");
+        return;
+    }
+
+    if (type->ty == PTR) {
+        printf("ptr of ");
+        dump_type(type->ptrof);
+        return;
+    }
+
+    printf("ty=%d?", type->ty);
+}
+
+// ローカル変数をデバッグ出力
+void dump_local_var(Map *map) {
+    printf("# local variables\n");
+
+    for (int i = 0; i < map->keys->len; i++) {
+        LocalVar *var = (LocalVar *)map->vals->data[i];
+        printf("#   name=%s, offset=%d, type=", (char *)map->keys->data[i], var->offset);
+        dump_type(var->type);
+        printf("\n");
+    }
+
+    printf("# end\n");
+}
+
+
 //- <function> ::= int IDENT '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
 Node *function() {
     local_var_map = new_map();
-    Node *node = new_node(ND_FUNC, NULL, NULL);
+    Node *node = new_node(ND_FUNC, NULL);
     node->params = new_vector();
 
     if (!consume(TK_INT)) {
@@ -344,6 +470,8 @@ Node *function() {
     if ((function_name = consume(TK_IDENT)) == NULL) {
         error_at(TOKEN(pos)->input, "識別子でないトークンです");
     }
+
+    node->token = function_name;
 
     node->name = function_name->name;
 
@@ -372,6 +500,10 @@ Node *function() {
     node->stmt = block();
     node->local_var_map = local_var_map;
 
+    allocate_local_var(local_var_map);
+
+    dump_local_var(local_var_map);
+
     return node;
 }
 
@@ -386,3 +518,4 @@ void program() {
         vec_push(functions, function());
     }
 }
+
