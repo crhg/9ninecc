@@ -61,7 +61,10 @@ Node *new_node_var(Token *token) {
 
 Node *expr();
 
-// termのパーサ
+//- <term> ::=
+//-     '(' <expr> ')'
+//-   | NUM
+//-   | IDENT ('(' (<expr> (',' <expr>)* )? ')' )?
 Node *term() {
     if (consume('(')) {
         Node *node = expr();
@@ -105,7 +108,7 @@ Node *term() {
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }
 
-// unaryのパーサ
+//- <unary> ::= ('+'|'-') <term>
 Node *unary() {
     if (consume('+'))
         return term();
@@ -114,7 +117,7 @@ Node *unary() {
     return term();
 }
 
-// mulのパーサ
+//- <mul> ::= <unary> (('*'|'/') <unary>)*
 Node *mul() {
     Node *node = unary();
 
@@ -128,7 +131,7 @@ Node *mul() {
     }
 }
 
-// addのパーサ
+//- <add> ::= <mul> (('+'|'-') <mul>)*
 Node *add() {
     Node *node = mul();
 
@@ -142,7 +145,7 @@ Node *add() {
     }
 }
 
-// 大小関係のバーサ
+//- <relational> ::= <add> (('<'|LE|'>'|GE) <add>)*
 Node *relational() {
     Node *node = add();
 
@@ -160,7 +163,7 @@ Node *relational() {
     }
 }
 
-// ==と!=のパーサ
+//- <equality> ::= <relational>> ((EQ|NE) <relational>)*
 Node *equality() {
     Node *node = relational();
 
@@ -174,7 +177,7 @@ Node *equality() {
     }
 }
 
-// 代入式のパーサ
+//- <assign> ::= <equality> ('=' <assign>)*
 Node *assign() {
     Node *node = equality();
     if (consume('='))
@@ -182,14 +185,14 @@ Node *assign() {
     return node;
 }
 
-// 式のパーサ
+//- <expr> ::= <assign>
 Node *expr() {
     return assign();
 }
 
 Node *stmt();
 
-// ブロックのパーサ
+//- <block> ::= '{' <stmt>* '}'
 Node *block() {
     if (!consume('{')) {
         error_at(TOKEN(pos)->input, "'{'でないトークンです2");
@@ -206,8 +209,14 @@ Node *block() {
     return node;
 }
 
-
-// 文のパーサ
+//- <stmt> ::=
+//-      if '(' <expr> ')' <stmt> (else <stmt>)?
+//-    | while '(' <expr> ')' <stmt>
+//-    | for '(' <expr>? ';' <expr>? ';' <expr>? ')' <stmt>
+//-    | int IDENT ';'
+//-    | <block>
+//-    | return <expr> ';'
+//-    | <expr> ';'
 Node *stmt() {
     Node *node;
 
@@ -312,7 +321,7 @@ Node *stmt() {
     return node;
 }
 
-// 関数定義のパーサ
+//- <function> ::= int IDENT '(' (int IDENT (',' int IDENT)*)? ')' <block>
 Node *function() {
     local_var_map = new_map();
     Node *node = new_node(ND_FUNC, NULL, NULL);
@@ -380,7 +389,7 @@ Node *function() {
 // 関数定義のベクター
 Vector *functions;
 
-// プログラムのパーサ
+//- <program> ::= <function>* EOF
 void program() {
     functions = new_vector();
 
