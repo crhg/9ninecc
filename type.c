@@ -12,6 +12,23 @@ Type *pointer_of(Type *type) {
     return ret;
 }
 
+// 型が等しいかどうか調べる
+int type_eq(Type *x, Type *y) {
+    if (x == y) {
+        return 1;
+    }
+
+    if (x->ty != y->ty) {
+        return 0;
+    }
+
+    if (x->ty == PTR) {
+        return (type_eq(x->ptrof, y->ptrof));
+    }
+
+    return 1;
+}
+
 Type *assign_type_to_lval(Node *node);
 
 // 式に型をつける
@@ -51,14 +68,14 @@ Type *assign_type_to_expr(Node *node) {
             ltype = assign_type_to_expr(node->lhs);
             rtype = assign_type_to_expr(node->rhs);
             if (ltype->ty == PTR && rtype->ty == INT) {
-                // コード生成の都合のためlhsが整数,rhsがポインタになるように交換する
+                return ltype;
+            }
+            if (ltype->ty == INT && rtype->ty == PTR) {
+                // コード生成の都合のためrhsが整数,lhsがポインタになるように交換する
                 Node *tmp;
                 tmp = node->lhs;
                 node->lhs = node->rhs;
                 node->rhs = tmp;
-                return ltype;
-            }
-            if (rtype->ty == PTR && ltype->ty == INT) {
                 return rtype;
             }
             if (rtype->ty == PTR && ltype->ty == PTR) {
@@ -75,10 +92,10 @@ Type *assign_type_to_expr(Node *node) {
             if (ltype->ty == INT && rtype->ty == PTR) {
                 error_at_node(node, "整数からポインタは引けません");
             }
-            if (rtype->ty == PTR && ltype->ty == PTR) {
-                // TODO: ポインタの引き算はあったような気がする
-                error("ポインタ同士の減算はできません");
+            if (ltype->ty == PTR && rtype->ty == PTR && !type_eq(ltype, rtype)) {
+                error_at_node(node, "異なる型のポインタの減算はできません");
             }
+                
             return node->type = &int_type;
         case '*':
         case '/':

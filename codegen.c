@@ -490,11 +490,84 @@ void gen(Node *node) {
         return;
     }
 
-    // 以下2項演算子
-    print_comment_start("binop");
-    if (node->lhs == NULL || node->rhs == NULL) {
-        error("たぶん2項演算子ではないノード: %d", node->ty);
+    if (node->ty == '+') {
+        print_comment_start("+");
+        assert_at_node(node, node->lhs->type != NULL, "lhs type is null");
+
+        print_comment("lhs");
+        gen(node->lhs);
+        print_comment("rhs");
+        gen(node->rhs);
+        print_comment("return from rhs");
+
+        printf("  pop rax\n");
+        if (node->lhs->type->ty == PTR) {
+            // lhsがポインタならポインタが指す型のサイズをrhsの整数値に掛けてから加算
+            print_comment("pointer + int");
+            assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
+
+            printf("  mov rdi,%d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  imul rdi\n");
+        }
+
+        printf("  pop rdi\n");
+        printf("  add rax, rdi\n");
+
+        printf("  push rax\n");
+        stack_pop(8);
+        print_comment_end("+");
+        
+        return;
     }
+
+    if (node->ty == '-') {
+        print_comment_start("-");
+        assert_at_node(node, node->lhs->type != NULL, "lhs type is null");
+        assert_at_node(node, node->rhs->type != NULL, "rhs type is null");
+
+        print_comment("lhs");
+        gen(node->lhs);
+        print_comment("rhs");
+        gen(node->rhs);
+        print_comment("return from rhs");
+
+        if (node->lhs->type->ty == PTR && node->rhs->type->ty == INT) {
+            print_comment("pointer - int");
+            assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
+
+            printf("  pop rax\n");
+            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  imul rdi\n");
+            printf("  mov rdi, rax\n");
+            printf("  pop rax\n");
+            printf("  sub rax, rdi\n");
+        } else if (node->lhs->type->ty == PTR && node->rhs->type->ty == PTR) {
+            // 結果をポインタの指す型のサイズで割り算する
+            print_comment("pointer - pointer");
+            assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
+
+            printf("  pop rdi\n");
+            printf("  pop rax\n");
+            printf("  sub rax, rdi\n");
+            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  cqo\n");
+            printf("  idiv rdi\n");
+        } else {
+            print_comment("int - int");
+            printf("  pop rdi\n");
+            printf("  pop rax\n");
+            printf("  sub rax, rdi\n");
+        }
+
+        printf("  push rax\n");
+        stack_pop(8);
+        print_comment_end("-");
+        return;
+    }
+
+    // 以下残りの2項演算子
+    print_comment_start("binop");
+    assert_at_node(node, node->lhs != NULL && node->rhs != NULL, "たぶん2項演算子ではないノード: %d", node->ty);
 
     print_comment("lhs");
     gen(node->lhs);
@@ -506,28 +579,6 @@ void gen(Node *node) {
     printf("  pop rax\n");
 
     switch (node->ty) {
-    case '+':
-        // raxを掛け算に使いたいからポインタと整数の加算のときは
-        // 型付け時にポインタの方をrhsに寄せていることに注意
-        print_comment("+");
-        if (node->rhs->type == NULL) {
-            error_at_node(node, "rhs type is null");
-        }
-        if (node->rhs->type->ty == PTR) {
-            print_comment("int + pointer");
-            // rhsがポインタならポインタが指す型のサイズをlhsの整数値に掛けてから加算
-            if (node->rhs->type->ptrof == NULL) {
-                error_at_node(node, "rhs->type->ptrof is null");
-            }
-            printf("  mov r10,%d\n", get_size_of(node->rhs->type->ptrof->ty));
-            printf("  imul r10\n");
-        }
-        printf("  add rax, rdi\n");
-        break;
-    case '-':
-        print_comment("=");
-        printf("  sub rax, rdi\n");
-        break;
     case '*':
         print_comment("*");
         printf("  imul rdi\n");

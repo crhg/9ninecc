@@ -135,6 +135,7 @@ _Noreturn void verror_at(char *loc, char *fmt, va_list args);
 _Noreturn void error_at_token(Token *token, char *fmt, ...);
 _Noreturn void verror_at_token(Token *token, char *fmt, va_list args);
 _Noreturn void error_at_node(Node *node, char *fmt, ...);
+void assert_at_node(Node *node, int cond, char *fmt, ...);
 
 void print_loc(char *loc);
 void print_token_pos(Token *token);

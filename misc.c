@@ -42,6 +42,14 @@ void verror_at_token(Token *token, char *fmt, va_list args) {
     }
 }
 
+void assert_at_node(Node *node, int cond, char *fmt, ...) {
+    if (cond) return;
+
+    va_list ap;
+    va_start(ap, fmt);
+    verror_at_token(node->token, fmt, ap);
+}
+
 void error_at_node(Node *node, char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);

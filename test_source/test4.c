@@ -16,4 +16,6 @@ int **getdata2() {
     return r;
 }
 
-
+int *at(int i) {
+    return &data[i];
+}
