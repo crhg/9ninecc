@@ -22,20 +22,16 @@ Node *new_node(int ty, Token *token) {
 
 // 2項演算子のノードを作る
 Node *new_node_binop(int ty, Node *lhs, Node *rhs, Token *token) {
-    Node *node = malloc(sizeof(Node));
-    node->ty = ty;
+    Node *node = new_node(ty, token);
     node->lhs = lhs;
     node->rhs = rhs;
-    node->token = token;
     return node;
 }
 
 // 数値のノードを作る
-Node *new_node_num(int val) {
-    Node *node = malloc(sizeof(Node));
-    node->ty = ND_NUM;
+Node *new_node_num(int val, Token *token) {
+    Node *node = new_node(ND_NUM, token);
     node->val = val;
-    node->token = NULL;
     return node;
 }
 
@@ -43,10 +39,8 @@ Node *new_node_num(int val) {
 Node *new_node_var(Token *token) {
     LocalVar *local_var = LOCAL_VAR(token->name);
     if (local_var != NULL) {
-        Node *node = malloc(sizeof(Node));
-        node->ty = ND_LOCAL_VAR;
+        Node *node = new_node(ND_LOCAL_VAR, token);
         node->local_var = local_var;
-        node->token = token;
         return node;
     }
 
@@ -84,7 +78,7 @@ Node *term() {
     }
 
     if ((token = consume(TK_NUM)) != NULL)
-        return new_node_num(token->val);
+        return new_node_num(token->val, token);
 
     if ((token = consume(TK_IDENT)) != NULL) {
         if (!consume('(')) {
@@ -123,7 +117,7 @@ Node *unary() {
     if (consume('+'))
         return term();
     if ((token = consume('-')))
-        return new_node_binop('-', new_node_num(0), term(), token);
+        return new_node_binop('-', new_node_num(0, token), term(), token);
     return term();
 }
 
