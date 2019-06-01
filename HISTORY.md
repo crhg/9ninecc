@@ -185,17 +185,17 @@ push, popしてるところにスタック追跡をばらまく。
 
 * 式の型付けは構文木ができてからやる。
 
-### ポインタの加算(https://github.com/crhg/9ninecc/commit/0485ab94cb70234c4f6cea1de5d30e2ce39f134c)
+### [ポインタの加算](https://github.com/crhg/9ninecc/commit/0485ab94cb70234c4f6cea1de5d30e2ce39f134c)
 
 またもやバグを仕込んで苦戦。生成するアセンブラソースにどのノードのコード生成かをコメントとして埋め込んで追跡しやすくする試み。
 
 ポインタと整数の加算は整数にサイズを掛け算するのだけどそのときraxを使うので型付け時に整数を左辺に入れ替えるというハック。
 
-### ポイント型へのポインタの加算のテストを追加(https://github.com/crhg/9ninecc/commit/fefb8eadbe05e6d6fdb1721ad6833f804861f72f)
+### [ポイント型へのポインタの加算のテストを追加](https://github.com/crhg/9ninecc/commit/fefb8eadbe05e6d6fdb1721ad6833f804861f72f)
 
 整数型へのポインタについてしかテストしてなかったのでテスト追加。テスト用のデータを用意するプログラムの方にうっかりバグを仕込んで気付かず苦戦。本体は正しかった...
 
-### ポインタの減算(https://github.com/crhg/9ninecc/commit/5140dec0357e1e4f06fa3e2a83f2ef87c58d5290)
+### [ポインタの減算](https://github.com/crhg/9ninecc/commit/5140dec0357e1e4f06fa3e2a83f2ef87c58d5290)
 
 加算のときの右辺と左辺を入れ替えるハックは減算のときにはあえなく破綻するので、2項演算子共通処理から加算と減算を分離して整理。
 
