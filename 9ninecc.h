@@ -55,6 +55,9 @@ typedef struct Type {
     enum { INT, PTR } ty;
     struct Type *ptrof;
 } Type;
+extern Type int_type;
+Type *pointer_of(Type *type);
+int type_eq(Type *x, Type *y);
 
 // ローカル変数
 typedef struct LocalVar {
