@@ -100,6 +100,8 @@ try_output_raw "6765" "int main(){pr_int(fib(20));} int fib(int n){if(n <= 2)ret
 try_output_raw 3 'int main() { int x; x = 3; int *y; pr_int(3);}' test_source/print.c
 try_output_raw 3 'int main() { int x; x = 3; int *y; y = &x; int z; z = *y; pr_int(z);}' test_source/print.c
 try_output_raw 3 'int main() { int x; x = 3; int *y; y = &x; pr_int(*y); }' test_source/print.c
+try_output_raw 10 'int main() { int *p; p = getdata(); pr_int(*p); }' test_source/test4.c test_source/print.c
+try_output_raw 30 'int main() { int *p; p = getdata(); pr_int(*(p + 2)); }' test_source/test4.c test_source/print.c
 
 echo OK
 

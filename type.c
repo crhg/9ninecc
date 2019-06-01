@@ -42,7 +42,7 @@ Type *assign_type_to_expr(Node *node) {
             lval_type = assign_type_to_lval(node->lhs);
             if (lval_type == NULL) {
                 // TODO: エラー発生位置を表示したい
-                error("代入先が左辺値でありません");
+                error_at_node(node, "代入先が左辺値でありません");
             }
             type = assign_type_to_expr(node->rhs);
             return type;
@@ -51,13 +51,18 @@ Type *assign_type_to_expr(Node *node) {
             ltype = assign_type_to_expr(node->lhs);
             rtype = assign_type_to_expr(node->rhs);
             if (ltype->ty == PTR && rtype->ty == INT) {
+                // コード生成の都合のためlhsが整数,rhsがポインタになるように交換する
+                Node *tmp;
+                tmp = node->lhs;
+                node->lhs = node->rhs;
+                node->rhs = tmp;
                 return ltype;
             }
             if (rtype->ty == PTR && ltype->ty == INT) {
                 return rtype;
             }
             if (rtype->ty == PTR && ltype->ty == PTR) {
-                error("ポインタ同士の加算はできません");
+                error_at_node(node, "ポインタ同士の加算はできません");
             }
             return node->type = &int_type;
         case '-':
@@ -68,7 +73,7 @@ Type *assign_type_to_expr(Node *node) {
                 return ltype;
             }
             if (ltype->ty == INT && rtype->ty == PTR) {
-                error("整数からポインタは引けません");
+                error_at_node(node, "整数からポインタは引けません");
             }
             if (rtype->ty == PTR && ltype->ty == PTR) {
                 // TODO: ポインタの引き算はあったような気がする
