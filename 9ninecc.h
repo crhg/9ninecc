@@ -53,11 +53,13 @@ typedef enum IdType {
 
 // 型
 typedef struct Type {
-    enum { INT, PTR } ty;
+    enum { INT, PTR, ARRAY } ty;
     struct Type *ptrof;
+    int array_size;
 } Type;
 extern Type int_type;
 Type *pointer_of(Type *type);
+Type *array_of(Type *type, int size);
 int type_eq(Type *x, Type *y);
 
 // ローカル変数

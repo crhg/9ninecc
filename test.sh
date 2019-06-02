@@ -115,6 +115,7 @@ try 4 "int a; return sizeof(a);"
 try 8 "int a; return sizeof(&a);"
 try 8 "int *a; return sizeof(a);"
 try 4 "int *a; return sizeof(*a);"
+try 0 "int a[10]; return 0;"
 
 echo OK
 

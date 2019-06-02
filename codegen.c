@@ -133,6 +133,16 @@ char * select_reg(int ty, Reg reg) {
     return reg_table[reg][reg_size];
 }
 
+// ローカル変数の領域割り当てサイズ
+int get_size_of_local_vars(Map *map) {
+    if (map->vals->len == 0) {
+        return 0;
+    }
+
+    // 最後の要素のオフセットが割り当てサイズになる
+    return ((LocalVar *)map->vals->data[map->vals->len-1])->offset;
+}
+
 // 左辺値のコード生成
 // アドレスをスタックトップにプッシュする
 // 型を返す
@@ -437,7 +447,7 @@ void gen(Node *node) {
         // プロローグ
         printf("  push rbp\n");
         printf("  mov rbp, rsp\n");
-        printf("  sub rsp, %d\n", node->local_var_map->keys->len * 8);
+        printf("  sub rsp, %d\n", get_size_of_local_vars(node->local_var_map));
 
         // rbp + 0: 以前のrbp
         // rbp + 8: 戻り番地

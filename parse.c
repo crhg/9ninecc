@@ -328,7 +328,26 @@ Node *block() {
     return node;
 }
 
-//- <ptr_ident> :: = IDENT || '*' <ptr_ident>
+// 定数式の値を求める
+int eval_constant_expr(Node *node) {
+    switch (node->ty) {
+        case ND_NUM:
+            return node->val;
+        case '+':
+            return eval_constant_expr(node->lhs) + eval_constant_expr(node->rhs);
+        case '-':
+            return eval_constant_expr(node->lhs) - eval_constant_expr(node->rhs);
+        case '*':
+            return eval_constant_expr(node->lhs) * eval_constant_expr(node->rhs);
+        case '/':
+            return eval_constant_expr(node->lhs) / eval_constant_expr(node->rhs);
+        // TODO: 演算子のバリエーション
+        default:
+            error_at_node(node, "定数式ではありません");
+    }
+}
+
+//- <ptr_ident> :: = IDENT ('[' <expr> ']')? | '*' <ptr_ident>
 Node *ptr_ident(Type *type) {
     Node *node;
 
@@ -342,6 +361,15 @@ Node *ptr_ident(Type *type) {
 
     Token *id;
     if ((id = consume(TK_IDENT)) != NULL) {
+        if (consume('[')) {
+            Node *size_expr = expr();
+            if (!consume(']')) {
+                error_at(TOKEN(pos)->input, "']'でないトークンです");
+            }
+
+            type = array_of(type, eval_constant_expr(size_expr));
+        }
+
         node = new_node(ND_IDENT, id);
         node->name = id->name;
         node->type = type;
@@ -491,8 +519,24 @@ int get_size_of(Type *type) {
             return 4;
         case PTR:
             return 8;
+        case ARRAY:
+            return get_size_of(type->ptrof) * type->array_size;
         default:
             error("unknown type(get_size_of): %d", type->ty);
+    }
+}
+
+// 型のアラインメント
+int get_alignment(Type *type) {
+    switch (type->ty) {
+        case INT:
+            return 4;
+        case PTR:
+            return 8;
+        case ARRAY:
+            return get_alignment(type->ptrof);
+        default:
+            error("unknown type(get_alignment): %d", type->ty);
     }
 }
 
@@ -504,10 +548,11 @@ void allocate_local_var(Map *map) {
     for (int i = 0; i < n; i++) {
         LocalVar *var = LOCAL_VAR_AT(i);
         int size = get_size_of(var->type);
+        int alignment = get_alignment(var->type);
 
         offset += size;
-        if (offset % size != 0) {
-            offset += (size - offset % size);
+        if (offset % alignment != 0) {
+            offset += (size - offset % alignment);
         }
 
         var->offset = offset;
@@ -531,6 +576,12 @@ void dump_type(Type *type) {
         return;
     }
 
+    if (type->ty == ARRAY) {
+        printf("array[%d] of ", type->array_size);
+        dump_type(type->ptrof);
+        return;
+    }
+
     printf("ty=%d?", type->ty);
 }
 
@@ -548,8 +599,20 @@ void dump_local_var(Map *map) {
     printf("# end\n");
 }
 
+Node *param_def() {
+    Node *node = local_var_def();
+
+    switch (node->local_var->type->ty) {
+        case INT:
+        case PTR:
+            return node;
+        default:
+            error_at_node(node, "パラメタはINTかポインタでなければなりません");
+    }
+}
 
 //- <function> ::= int IDENT '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
+//  ただしパラメタはintかポインタのみ許される
 Node *function() {
     local_var_map = new_map();
     Node *node = new_node(ND_FUNC, NULL);
@@ -575,10 +638,10 @@ Node *function() {
     if (consume(')')) {
         // 引数無し
     } else {
-        vec_push(node->params, local_var_def());
+        vec_push(node->params, param_def());
 
         while (consume(',')) {
-            vec_push(node->params, local_var_def());
+            vec_push(node->params, param_def());
         }
 
         if (!consume(')')) {

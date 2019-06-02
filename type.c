@@ -12,6 +12,15 @@ Type *pointer_of(Type *type) {
     return ret;
 }
 
+// 配列の型
+Type *array_of(Type *type, int size) {
+    Type *ret = malloc(sizeof(Type));
+    ret->ty = ARRAY;
+    ret->ptrof = type;
+    ret->array_size = size;
+    return ret;
+}
+
 // 型が等しいかどうか調べる
 int type_eq(Type *x, Type *y) {
     if (x == y) {
