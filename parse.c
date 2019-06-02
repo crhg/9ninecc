@@ -50,6 +50,39 @@ Node *new_node_var(Token *token) {
     return node;
 }
 
+// 足し算のノードを作る
+Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
+    if (rhs->type->ty == PTR) {
+        Node *tmp;
+
+        tmp = rhs;
+        rhs = lhs;
+        lhs = tmp;
+    }
+
+    // XXX: INTとPTRしかないのでこの判定
+    if (rhs->type->ty != INT) {
+        error_at_token(token, "加算できない型の組み合わせです");
+    }
+
+    Node *node = new_node_binop('+', lhs, rhs, token);
+    node->type = lhs->type;
+
+    return node;
+}
+
+Node *new_node_ptr(Node *pt, Token *token) {
+    if (pt->type->ty != PTR) {
+        error_at_node(pt, "ポインタ型でありません");
+    }
+
+    Node *node = new_node(ND_PTR, token);
+    node->ptrto = pt;
+    node->type = pt->type->ptrof;
+
+    return node;
+}
+
 // lvalueか判定
 int is_lvalue(Node * node) {
     if (node->ty == ND_LOCAL_VAR) {
@@ -69,11 +102,9 @@ Node *expr();
 //-     '(' <expr> ')'
 //-   | NUM
 //-   | IDENT ('(' (<expr> (',' <expr>)* )? ')' )?
-//-   | * <term>
-//-   | & <term>
+
 Node *term() {
     Node *node;
-    Node *node_term;
     Token *token;
 
     if (consume('(')) {
@@ -81,30 +112,6 @@ Node *term() {
         if (!consume(')'))
             error_at(TOKEN(pos)->input, "開きカッコに対応する閉じカッコがありません");
         return node_expr;
-    }
-
-    if ((token = consume('*'))) {
-        node_term = term();
-        if (node_term->type->ty != PTR) {
-            error_at_node(node_term, "ポインタ型でありません");
-        }
-
-        node = new_node(ND_PTR, token);
-        node->ptrto = node_term;
-        node->type = node_term->type->ptrof;
-        return node;
-    }
-
-    if ((token = consume('&'))) {
-        node_term = term();
-        if (!is_lvalue(node_term)) {
-            error_at_node(node_term, "lvalueでありません: %d", node_term->ty);
-        }
-
-        node = new_node(ND_PTR_OF, token);
-        node->ptrof = node_term;
-        node->type = pointer_of(node_term->type);
-        return node;
     }
 
     if ((token = consume(TK_NUM)) != NULL)
@@ -142,8 +149,49 @@ Node *term() {
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }
 
+//- <array_term>> ::= <term> ('[' <expr> ']')*
+Node *array_term() {
+    Node *node = term();
+
+    Token *token;
+    while ((token = consume('['))) {
+        Node *e = expr();
+
+        if (!consume(']')) {
+            error_at(token->input, "']'がありません");
+        }
+
+        node = new_node_ptr(new_node_add(node, e, token), token);
+    }
+
+    return node;
+}
+
+//- <pointer_term> = <array_term> | ('*' | '&') <pointer_term>
+Node *pointer_term() {
+    Token *token;
+    if ((token = consume('*'))) {
+        return new_node_ptr(pointer_term(), token);
+    }
+
+    if ((token = consume('&'))) {
+        Node *pt;
+        pt = pointer_term();
+        if (!is_lvalue(pt)) {
+            error_at_node(pt, "lvalueでありません: %d", pt->ty);
+        }
+
+        Node *node = new_node(ND_PTR_OF, token);
+        node->ptrof = pt;
+        node->type = pointer_of(pt->type);
+        return node;
+    }
+
+    return array_term();
+}
+
 //- <unary> ::= sizeof <unary>
-//-           | ('+'|'-') <term>
+//-           | ('+'|'-') <pointer_term>
 Node *unary() {
     Token *token;
     if ((token = consume(TK_SIZEOF))) {
@@ -152,10 +200,10 @@ Node *unary() {
     }
 
     if (consume('+'))
-        return term();
+        return pointer_term();
 
     if ((token = consume('-'))) {
-        Node *node_term = term();
+        Node *node_term = pointer_term();
         if (node_term->type->ty == PTR) {
             error_at_node(node_term, "ポインターを負にすることはできません");
         }
@@ -164,7 +212,7 @@ Node *unary() {
         node->type = &int_type;
         return node;
     }
-    return term();
+    return pointer_term();
 }
 
 //- <mul> ::= <unary> (('*'|'/') <unary>)*
@@ -208,25 +256,11 @@ Node *add() {
     Token *token;
     Node *lhs;
     Node *rhs;
-    Node *tmp;
     for (;;) {
         if ((token = consume('+'))) {
             lhs = node;
             rhs = mul();
-
-            if (rhs->type->ty == PTR) {
-                tmp = rhs;
-                rhs = lhs;
-                lhs = tmp;
-            }
-
-            // XXX: INTとPTRしかないのでこの判定
-            if (rhs->type->ty != INT) {
-                error_at_token(token, "加算できない型の組み合わせです");
-            }
-
-            node = new_node_binop('+', lhs, rhs, token);
-            node->type = lhs->type;
+            node = new_node_add(lhs, rhs, token);
         } else if ((token = consume('-'))) {
             lhs = node;
             rhs = mul();

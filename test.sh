@@ -116,6 +116,14 @@ try 8 "int a; return sizeof(&a);"
 try 8 "int *a; return sizeof(a);"
 try 4 "int *a; return sizeof(*a);"
 try 0 "int a[10]; return 0;"
+try_output_raw 10 'int main() { int *p; p = getdata(); pr_int(p[0]); }' test_source/test4.c test_source/print.c
+try_output_raw 30 'int main() { int *p; p = getdata(); pr_int(p[2]); }' test_source/test4.c test_source/print.c
+try_output_raw 10 'int main() { int *p; p = getdata(); pr_int(0[p]); }' test_source/test4.c test_source/print.c
+try_output_raw 30 'int main() { int *p; p = getdata(); pr_int(2[p]); }' test_source/test4.c test_source/print.c
+try_output_raw 40 'int main() { int **p; p = getdata2(); pr_int(*p[0]); }' test_source/test4.c test_source/print.c
+try_output_raw 20 'int main() { int **p; p = getdata2(); pr_int(*p[2]); }' test_source/test4.c test_source/print.c
+try_output_raw 40 'int main() { int **p; p = getdata2(); pr_int(*0[p]); }' test_source/test4.c test_source/print.c
+try_output_raw 20 'int main() { int **p; p = getdata2(); pr_int(*2[p]); }' test_source/test4.c test_source/print.c
 
 echo OK
 
