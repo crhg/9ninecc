@@ -31,6 +31,7 @@ enum {
     TK_WHILE,
     TK_FOR,
     TK_INT,
+    TK_SIZEOF,
     TK_EQ,        // ==
     TK_NE,        // !=
     TK_LE,        // <=
@@ -160,7 +161,7 @@ extern Map *local_var_map;
 #define LOCAL_VAR_NUM (map->keys->len)
 int get_local_var_offset(char *name);
 int new_local_var_offset(char *name);
-int get_size_of(int type);
+int get_size_of(Type *type);
 
 // コード生成
 void gen(Node *node);

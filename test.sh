@@ -110,6 +110,11 @@ try_output_raw 20 'int main() { int **p; p = getdata2(); p = p + 2; pr_int(**p);
 try_output_raw 30 'int main() { int **p; p = getdata2(); p = p + 2; pr_int(**(p - 1)); }' test_source/test4.c test_source/print.c
 try_output_raw 2 'int main() { int *p; int *q; p=at(1); q=at(3); pr_int(q-p); }' test_source/test4.c test_source/print.c
 try_output_raw -2 'int main() { int *p; int *q; p=at(1); q=at(3); pr_int(p-q); }' test_source/test4.c test_source/print.c
+try 4 "return sizeof(5);"
+try 4 "int a; return sizeof(a);"
+try 8 "int a; return sizeof(&a);"
+try 8 "int *a; return sizeof(a);"
+try 4 "int *a; return sizeof(*a);"
 
 echo OK
 

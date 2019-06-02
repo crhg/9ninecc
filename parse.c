@@ -142,11 +142,18 @@ Node *term() {
     error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
 }
 
-//- <unary> ::= ('+'|'-') <term>
+//- <unary> ::= sizeof <unary>
+//-           | ('+'|'-') <term>
 Node *unary() {
     Token *token;
+    if ((token = consume(TK_SIZEOF))) {
+        Node *node_unary = unary();
+        return new_node_num(get_size_of(node_unary->type), token);
+    }
+
     if (consume('+'))
         return term();
+
     if ((token = consume('-'))) {
         Node *node_term = term();
         if (node_term->type->ty == PTR) {
@@ -478,14 +485,14 @@ Node *stmt() {
 }
 
 // 型のバイト数
-int get_size_of(int type) {
-    switch (type) {
+int get_size_of(Type *type) {
+    switch (type->ty) {
         case INT:
             return 4;
         case PTR:
             return 8;
         default:
-            error("unknown type(get_size_of): %d", type);
+            error("unknown type(get_size_of): %d", type->ty);
     }
 }
 
@@ -496,7 +503,7 @@ void allocate_local_var(Map *map) {
     int offset = 0;
     for (int i = 0; i < n; i++) {
         LocalVar *var = LOCAL_VAR_AT(i);
-        int size = get_size_of(var->type->ty);
+        int size = get_size_of(var->type);
 
         offset += size;
         if (offset % size != 0) {

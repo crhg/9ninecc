@@ -182,6 +182,12 @@ void tokenize() {
             continue;
         }
 
+        if (keyword(p, &np, "sizeof")) {
+            push_token(TK_SIZEOF, p);
+            p = np;
+            continue;
+        }
+
 
         if (isdigit(*p)) {
             Token *num_token = push_token(TK_NUM, p);

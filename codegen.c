@@ -506,7 +506,7 @@ void gen(Node *node) {
             print_comment("pointer + int");
             assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
 
-            printf("  mov rdi,%d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  mov rdi,%d\n", get_size_of(node->lhs->type->ptrof));
             printf("  imul rdi\n");
         }
 
@@ -536,7 +536,7 @@ void gen(Node *node) {
             assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
 
             printf("  pop rax\n");
-            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof));
             printf("  imul rdi\n");
             printf("  mov rdi, rax\n");
             printf("  pop rax\n");
@@ -549,7 +549,7 @@ void gen(Node *node) {
             printf("  pop rdi\n");
             printf("  pop rax\n");
             printf("  sub rax, rdi\n");
-            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof->ty));
+            printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof));
             printf("  cqo\n");
             printf("  idiv rdi\n");
         } else {
