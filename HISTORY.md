@@ -245,3 +245,24 @@ gcc -S -masm=intel hoge.c
 ```
 clang -S -mllvm --x86-asm-syntax=intel hoge.c
 ```
+
+### [char型](https://github.com/crhg/9ninecc/commit/bcf4a91de156f3e0c89456b8053290eafd38d0aa)
+
+パーサまでは素直にいけたけど、あいかわらずコード生成は直交性がなくてつらい。
+
+### [文字列リテラル](https://github.com/crhg/9ninecc/commit/caa5ec6ea6855f3f0d50da7b9fd0160469b3bbe0)
+
+調子に乗って`printf`の呼び出しに挑戦したら
+
+```
+./tmp: Symbol `printf' causes overflow in R_X86_64_PC32 relocation
+```
+
+なるエラーに悩まされる。gccにコード吐かせて見比べると、`@PLT`なる謎の記述があり真似したらOKだった。
+
+```
+   call printf@PLT
+```
+
+調べたところPLTはProcedure Linkage Tableの略で、たぶん直接飛ぶようにリンクすると遠すぎてだめだったのがテーブル経由だと大丈夫とかそんな感じじゃないかと。
+テーブル経由するので近いときは直接飛ぶコードに比べて若干遅くなるだろうけどとりあえず気にしないで全部`@PLT`つきでコード生成することに。
