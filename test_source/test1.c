@@ -1,5 +1,5 @@
 #include <stdio.h>
 
-void foo() {
+void foo1() {
     printf("OK\n");
 }

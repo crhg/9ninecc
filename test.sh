@@ -95,9 +95,9 @@ try 0 "int a; a=0;while(a != 9999999) a=a+1; return 0;"
 try 50 "int a; int b; b=0;for(a=0;a<5;a=a+1) b=b+10; return b;"
 try 0 "int a;for(a=0; a != 9999999; a=a+1) return 0;"
 try 3 "{int a;a=1; a=a+2; return a;}"
-try_output OK "foo();" test_source/test1.c
-try 45 "return 1+foo()+2;" test_source/test2.c
-try_output 1-2-3-4-5-6-7-8 "foo(1,2,3,4,5,6,7,8);" test_source/test3.c
+try_output OK "foo1();" test_source/test1.c
+try 45 "return 1+foo2()+2;" test_source/test2.c
+try_output 1-2-3-4-5-6-7-8 "foo3(1,2,3,4,5,6,7,8);" test_source/test3.c
 try_output_raw "5" "int main(){pr_int(add(2,3));} int add(int a,int b){return a+b;}" test_source/print.c
 try_output_raw "6765" "int main(){pr_int(fib(20));} int fib(int n){if(n <= 2)return 1;else return fib(n-1)+fib(n-2);}" test_source/print.c
 try_output_raw 3 'int main() { int x; x = 3; int *y; pr_int(3);}' test_source/print.c
