@@ -5,8 +5,8 @@ try() {
     input="$2"
     shift 2
 
-    echo "int main(){$input}" > tmp.c
-    ./9ninecc tmp.c > tmp.s
+    echo "int main(){$input}" > test_source/tmp.c
+    ./9ninecc test_source/tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     ./tmp
     actual="$?"
@@ -24,8 +24,8 @@ try_output() {
     input="$2"
     shift 2
 
-    echo "int main(){$input}" > tmp.c
-    ./9ninecc tmp.c > tmp.s
+    echo "int main(){$input}" > test_source/tmp.c
+    ./9ninecc test_source/tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     actual=$(./tmp)
 
@@ -42,8 +42,8 @@ try_output_raw() {
     input="$2"
     shift 2
 
-    echo "$input" > tmp.c
-    ./9ninecc tmp.c > tmp.s
+    echo "$input" > test_source/tmp.c
+    ./9ninecc test_source/tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     actual=$(./tmp)
 
@@ -137,6 +137,7 @@ try_output_raw 100 'int g() {return 100;} int a;int f(int x){a=x;} int main() {f
 try_output_raw 10 'int a[10];int f(int x){a[3]=x;} int main() {f(10);pr_int(a[3]);}'  test_source/print.c
 try 3 'char x[3]; x[0]=-1; x[1]=2; int y; y=4; return x[0]+y;'
 try_output hoge 'printf("hoge");'
+try_output hoge '/* comment */printf("hoge");'
 
 
 echo OK
