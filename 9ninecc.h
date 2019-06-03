@@ -126,6 +126,9 @@ typedef struct Node {
     int str_index;      // ND_STRINGのときの文字列リテラルの通し番号
 } Node;
 
+// 入力プログラムのファイル名
+extern char *filename;
+
 // 入力プログラム
 extern char *user_input;
 
@@ -161,6 +164,9 @@ void assert_at_node(Node *node, int cond, char *fmt, ...);
 void print_loc(char *loc);
 void print_token_pos(Token *token);
 void print_node_pos(Node *node);
+
+// ファイルを読み込む
+char *read_file(char *path);
 
 // user_inputが指している文字列を
 // トークンに分割して保存する

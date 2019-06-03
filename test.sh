@@ -5,7 +5,8 @@ try() {
     input="$2"
     shift 2
 
-    ./9ninecc "int main(){$input}" > tmp.s
+    echo "int main(){$input}" > tmp.c
+    ./9ninecc tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     ./tmp
     actual="$?"
@@ -23,7 +24,8 @@ try_output() {
     input="$2"
     shift 2
 
-    ./9ninecc "int main(){$input}" > tmp.s
+    echo "int main(){$input}" > tmp.c
+    ./9ninecc tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     actual=$(./tmp)
 
@@ -40,7 +42,8 @@ try_output_raw() {
     input="$2"
     shift 2
 
-    ./9ninecc "$input" > tmp.s
+    echo "$input" > tmp.c
+    ./9ninecc tmp.c > tmp.s
     gcc -o tmp tmp.s "$@"
     actual=$(./tmp)
 

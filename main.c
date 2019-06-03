@@ -5,6 +5,9 @@
 #include <string.h>
 #include "9ninecc.h"
 
+// 入力ファイル名
+char *filename;
+
 // エラーを報告するための関数
 // printfと同じ引数を取る
 void error(char *fmt, ...) {
@@ -31,7 +34,8 @@ int main(int argc, char **argv) {
     }
 
     // トークナイズする
-    user_input = argv[1];
+    filename = argv[1];
+    user_input = read_file(filename);
     tokenize();
 
     // パース
