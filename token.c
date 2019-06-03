@@ -146,6 +146,28 @@ void tokenize() {
             continue;
         }
 
+        // 文字列トークン。とりあえずエスケープなどはなし
+        if (*p == '"') {
+            Token *s = push_token(TK_STRING, p);
+
+            char *q = p + 1;
+
+            while(*q != '"') {
+                if (*q == '\0') {
+                    error_at(p, "文字列リテラルの終端がありません");
+                }
+                q++;
+            }
+
+            size_t len = q - (p + 1);
+            s->str = malloc(len + 1);
+            strncpy(s->str, p + 1, len);
+            s->str[len] = '\0';
+
+            p = q + 1;
+            continue;
+        }
+
         char *np;
         if (keyword(p, &np, "return")) {
             push_token(TK_RETURN, p);

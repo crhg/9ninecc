@@ -23,6 +23,18 @@ LocalVar *new_local_var(char *name, Type *type) {
     return local_var;
 }
 
+// 文字列リテラルのベクター
+Vector *strings;
+
+// 新しい文字列リテラルを登録しインデックス番号を返す
+int new_string(char *string) {
+    int r = strings->len;
+
+    vec_push(strings, string);
+
+    return r;
+}
+
 // 式の値が配列型だったらポインタ型に書き換える
 // 暗黙の配列からポインタへの型変換に使う
 Node *conv_a_to_p(Node *node) {
@@ -143,6 +155,7 @@ Node *expr();
 //- <term> ::=
 //-     '(' <expr> ')'
 //-   | NUM
+//-   | STRING
 //-   | IDENT ('(' (<expr> (',' <expr>)* )? ')' )?
 
 Node *term() {
@@ -158,6 +171,14 @@ Node *term() {
 
     if ((token = consume(TK_NUM)) != NULL)
         return new_node_num(token->val, token);
+
+    if ((token = consume(TK_STRING)) != NULL) {
+        int index = new_string(token->str);
+        Node *node = new_node(ND_STRING, token);
+        node->str_index = index;
+        node->type = pointer_of(&char_type);
+        return node;
+    }
 
     if ((token = consume(TK_IDENT)) != NULL) {
         if (!consume('(')) {
@@ -775,6 +796,7 @@ Node *top_level() {
 Node *program() {
     Vector *top_levels = new_vector();
     global_var_map = new_map();
+    strings = new_vector();
 
     while (TOKEN(pos)->ty != TK_EOF) {
         vec_push(top_levels, top_level());
@@ -782,5 +804,6 @@ Node *program() {
 
     Node *node = new_node(ND_PROGRAM, NULL);
     node->top_levels = top_levels;
+    node->strings = strings;
     return node;
 }

@@ -146,6 +146,21 @@ int get_size_of_local_vars(Map *map) {
     return ((LocalVar *)map->vals->data[map->vals->len-1])->offset;
 }
 
+// 文字列リテラルのコード生成
+void gen_strings(Vector *strings) {
+    print_comment_start("文字列リテラル");
+
+    printf("  .text\n");
+    printf("  .section .rodata\n");
+
+    for (int i = 0; i < strings->len; i++) {
+        printf(".LC%d:\n", i);
+        printf("  .string \"%s\"\n", (char *)strings->data[i]);
+    }
+
+    print_comment_end("文字列リテラル");
+}
+
 // 左辺値のコード生成
 // アドレスをスタックトップにプッシュする
 // 型を返す
@@ -186,6 +201,8 @@ int  gen_lval(Node *node) {
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_PROGRAM) {
+        gen_strings(node->strings);
+
         for (int i = 0; i < node->top_levels->len; i++) {
             gen(node->top_levels->data[i]);
         }
@@ -194,6 +211,13 @@ void gen(Node *node) {
 
     if (node->ty == ND_NUM) {
         printf("  push %d # ND_NUM\n", node->val);
+        stack_push(8);
+        return;
+    }
+
+    if (node->ty == ND_STRING) {
+        printf("  lea rax, .LC%d[rip] # 文字列: \"%s\"\n", node->str_index, node->token->str);
+        printf("  push rax\n");
         stack_push(8);
         return;
     }
@@ -326,8 +350,11 @@ void gen(Node *node) {
             stack_pop(8);
         }
 
+        // 浮動小数点パラメタの数
+        printf("  mov al, 0\n");
+
         // 呼び出し
-        printf("  call %s\n", node->name);
+        printf("  call %s@PLT\n", node->name);
 
         // スタック回復
         restore_stack(adjusted + param_stack_size);

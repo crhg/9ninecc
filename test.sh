@@ -133,6 +133,7 @@ try_output_raw 10 'int a;int f(int x){a=x;} int main() {f(10);pr_int(a);}'  test
 try_output_raw 100 'int g() {return 100;} int a;int f(int x){a=x;} int main() {f(g());pr_int(a);}'  test_source/print.c
 try_output_raw 10 'int a[10];int f(int x){a[3]=x;} int main() {f(10);pr_int(a[3]);}'  test_source/print.c
 try 3 'char x[3]; x[0]=-1; x[1]=2; int y; y=4; return x[0]+y;'
+try_output hoge 'printf("hoge");'
 
 
 echo OK

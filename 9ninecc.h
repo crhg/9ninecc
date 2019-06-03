@@ -37,6 +37,7 @@ enum {
     TK_NE,        // !=
     TK_LE,        // <=
     TK_GE,        // >=
+    TK_STRING,    // 文字列リテラル
 };
 
 // トークンの型
@@ -44,6 +45,8 @@ typedef struct {
     int ty;      // トークンの型
     int val;     // tyがTK_NUMの場合、その数値
     char *name;  // tyがTK_IDENTの場合、その名前
+    char *str;   // tyがTK_STRINGの場合、その文字列
+
     char *input; //トークン文字列(エラーメッセージ用)
 } Token;
 
@@ -94,6 +97,7 @@ typedef enum NodeType {
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
+    ND_STRING,    // 文字列リテラル
 } NodeType;
 
 // ノードの型
@@ -118,6 +122,8 @@ typedef struct Node {
     Type *type;          // 式であるときその値の型(暗黙の配列ポインタ変換で変化する)
     Type *variable_type; // 変数参照のとき変数自体の型(変わらない)
     Vector *top_levels; // ND_PROGRAMのときのトップレベルのベクタ
+    Vector *strings;    // ND_PROGRAMのときのストリングリテラルのベクタ
+    int str_index;      // ND_STRINGのときの文字列リテラルの通し番号
 } Node;
 
 // 入力プログラム
