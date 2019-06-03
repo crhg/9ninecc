@@ -146,7 +146,13 @@ int get_size_of_local_vars(Map *map) {
 // 左辺値のコード生成
 // アドレスをスタックトップにプッシュする
 // 型を返す
+// XXX: 厳密には配列変数はlvalではないがアドレスは同じように求まるので使用可能
 int  gen_lval(Node *node) {
+    if (node->ty == ND_PTR) {
+        gen(node->ptrto);
+        return node->ptrto->type->ty;;
+    }
+
     if (node->ty != ND_LOCAL_VAR)
         error_at_node(node, "代入の左辺値が変数ではありません");
 
@@ -172,22 +178,30 @@ void gen(Node *node) {
 
     if (node->ty == ND_LOCAL_VAR) {
         // 変数の読み出し
-        // アドレスを求めて間接参照で読み出す
-
         print_comment_start("gen ND_LOCAL_VAR %s", node->token->name);
+
+        // アドレスを求める
+        // XXX: 厳密には配列変数はlvalではないがアドレスは同じように求まる
         gen_lval(node);
-        printf("  pop rax\n");
-        switch (node->local_var->type->ty) {
-            case INT:
-                printf("  mov eax, [rax]\n");
-                break;
-            case PTR:
-                printf("  mov rax, [rax]\n");
-                break;
-            default:
-                error_at_node(node, "unknown type(codegen): %d", node->local_var->type->ty);
+
+        if (node->local_var->type->ty == ARRAY) {
+            // 配列ならアドレスを返すので何もしない
+            print_comment("配列: %s", node->token->name);
+        } else {
+            print_comment("アドレスが求まったので読み出す");
+            printf("  pop rax\n");
+            switch (node->local_var->type->ty) {
+                case INT:
+                    printf("  mov eax, [rax] # int %s\n", node->token->name);
+                    break;
+                case PTR:
+                    printf("  mov rax, [rax] # ポインタ %s\n", node->token->name);
+                    break;
+                default:
+                    error_at_node(node, "unknown type(codegen): %d", node->local_var->type->ty);
+            }
+            printf("  push rax\n");
         }
-        printf("  push rax\n");
 
         print_comment_end("gen ND_LOCAL_VAR %s", node->token->name);
         return;

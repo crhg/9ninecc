@@ -124,6 +124,12 @@ try_output_raw 40 'int main() { int **p; p = getdata2(); pr_int(*p[0]); }' test_
 try_output_raw 20 'int main() { int **p; p = getdata2(); pr_int(*p[2]); }' test_source/test4.c test_source/print.c
 try_output_raw 40 'int main() { int **p; p = getdata2(); pr_int(*0[p]); }' test_source/test4.c test_source/print.c
 try_output_raw 20 'int main() { int **p; p = getdata2(); pr_int(*2[p]); }' test_source/test4.c test_source/print.c
+try 1 'int a; int *p; p = &a; *p = 1; return a;'
+try_output_raw 1 'int main() { int a[10]; a[0] = 1; pr_int(a[0]);}'  test_source/print.c
+try_output_raw 1 'int main() { int a[10]; int *p; p = a; *p = 1; pr_int(a[0]);}'  test_source/print.c
+try_output_raw 1 'int main() { int a[10]; int *p; a[5] = 1; p = &a[5]; pr_int(*p);}'  test_source/print.c
+try_output_raw 5 'int main() { int a[10]; pr_int(&a[5] - a);}'  test_source/print.c
+
 
 echo OK
 

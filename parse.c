@@ -13,6 +13,21 @@ LocalVar *new_local_var(char *name, Type *type) {
     map_put(local_var_map, name, local_var);
     return local_var;
 }
+
+// 式の値が配列型だったらポインタ型に書き換える
+// 暗黙の配列からポインタへの型変換に使う
+Node *conv_a_to_p(Node *node) {
+    assert_at_node(node, node->type != NULL, "ノードに型がありません(conv_a_to_p)");
+
+    if (node->type->ty == ARRAY) {
+        // XXX: Type構造体は共有されているのでnode->type->tyを直接書き換えてはいけない
+        // TODO: 毎回新しく割り当てるのももったいないような気もする
+        node->type = pointer_of(node->type->ptrof);
+    }
+
+    return node;
+}
+
 // ノードを作る
 Node *new_node(int ty, Token *token) {
     Node *node = malloc(sizeof(Node));
@@ -52,6 +67,9 @@ Node *new_node_var(Token *token) {
 
 // 足し算のノードを作る
 Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
+    lhs = conv_a_to_p(lhs);
+    rhs = conv_a_to_p(rhs);
+
     if (rhs->type->ty == PTR) {
         Node *tmp;
 
@@ -72,6 +90,8 @@ Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
 }
 
 Node *new_node_ptr(Node *pt, Token *token) {
+    pt = conv_a_to_p(pt);
+
     if (pt->type->ty != PTR) {
         error_at_node(pt, "ポインタ型でありません");
     }
@@ -86,7 +106,7 @@ Node *new_node_ptr(Node *pt, Token *token) {
 // lvalueか判定
 int is_lvalue(Node * node) {
     if (node->ty == ND_LOCAL_VAR) {
-        return 1;
+        return node->type->ty != ARRAY;;
     }
 
     if (node->ty == ND_PTR) {
@@ -95,6 +115,7 @@ int is_lvalue(Node * node) {
 
     return 0;
 }
+
 
 Node *expr();
 
@@ -177,6 +198,10 @@ Node *pointer_term() {
     if ((token = consume('&'))) {
         Node *pt;
         pt = pointer_term();
+        if (pt->type->ty == ARRAY) {
+            return conv_a_to_p(pt);
+        }
+
         if (!is_lvalue(pt)) {
             error_at_node(pt, "lvalueでありません: %d", pt->ty);
         }
@@ -203,7 +228,7 @@ Node *unary() {
         return pointer_term();
 
     if ((token = consume('-'))) {
-        Node *node_term = pointer_term();
+        Node *node_term = conv_a_to_p(pointer_term());
         if (node_term->type->ty == PTR) {
             error_at_node(node_term, "ポインターを負にすることはできません");
         }
@@ -223,7 +248,8 @@ Node *mul() {
     Token *token;
     for (;;) {
         if ((token = consume('*'))) {
-            rhs = unary();
+            node = conv_a_to_p(node);
+            rhs = conv_a_to_p(unary());
             if (node->type->ty == PTR) {
                 error_at_node(node, "ポインタの掛け算はできません");
             }
@@ -234,7 +260,8 @@ Node *mul() {
             node = new_node_binop('*', node, rhs, token);
             node->type = &int_type;
         } else if ((token = consume('/'))) {
-            rhs = unary();
+            node = conv_a_to_p(node);
+            rhs = conv_a_to_p(unary());
             if (node->type->ty == PTR) {
                 error_at_node(node, "ポインタの割り算はできません");
             }
@@ -262,8 +289,8 @@ Node *add() {
             rhs = mul();
             node = new_node_add(lhs, rhs, token);
         } else if ((token = consume('-'))) {
-            lhs = node;
-            rhs = mul();
+            lhs = conv_a_to_p(node);
+            rhs = conv_a_to_p(mul());
             node = new_node_binop('-', lhs, rhs, token);
 
             // XXX: INTとPTRしかないのでこの判定
@@ -287,16 +314,16 @@ Node *relational() {
     Token *token;
     for (;;) {
         if ((token = consume('<'))) {
-            node = new_node_binop('<', node, add(), token);
+            node = new_node_binop('<', conv_a_to_p(node), conv_a_to_p(add()), token);
             node->type = &int_type;
         } else if ((token = consume(TK_LE))) {
-            node = new_node_binop(ND_LE, node, add(), token);
+            node = new_node_binop(ND_LE, conv_a_to_p(node), conv_a_to_p(add()), token);
             node->type = &int_type;
         } else if ((token =consume('>'))) {
-            node = new_node_binop('<', add(), node, token);
+            node = new_node_binop('<', conv_a_to_p(add()), conv_a_to_p(node), token);
             node->type = &int_type;
         } else if ((token =consume(TK_GE))) {
-            node = new_node_binop(ND_LE, add(), node, token);
+            node = new_node_binop(ND_LE, conv_a_to_p(add()), conv_a_to_p(node), token);
             node->type = &int_type;
         } else {
             return node;
@@ -311,10 +338,10 @@ Node *equality() {
     Token *token;
     for (;;) {
         if ((token = consume(TK_EQ))) {
-            node = new_node_binop(ND_EQ, node, relational(), token);
+            node = new_node_binop(ND_EQ, conv_a_to_p(node), conv_a_to_p(relational()), token);
             node->type = &int_type;
         } else if ((token = consume(TK_NE))) {
-            node = new_node_binop(ND_NE, node, relational(), token);
+            node = new_node_binop(ND_NE, conv_a_to_p(node), conv_a_to_p(relational()), token);
             node->type = &int_type;
         } else {
             return node;
@@ -325,11 +352,16 @@ Node *equality() {
 //- <assign> ::= <equality> ('=' <assign>)*
 Node *assign() {
     Node *node = equality();
+
     Type *type = node->type;
 
     Token *token;
     if ((token = consume('='))) {
-        node = new_node_binop('=', node, assign(), token);
+        if (!is_lvalue(node)) {
+            error_at_node(node, "lvalueでありません");
+        }
+
+        node = new_node_binop('=', node, conv_a_to_p(assign()), token);
         // XXX: 代入式の型は左辺の型にしといたけど要確認
         node->type = type;
     }
