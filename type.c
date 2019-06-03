@@ -38,6 +38,34 @@ int type_eq(Type *x, Type *y) {
     return 1;
 }
 
+// 型のバイト数
+int get_size_of(Type *type) {
+    switch (type->ty) {
+        case INT:
+            return 4;
+        case PTR:
+            return 8;
+        case ARRAY:
+            return get_size_of(type->ptrof) * type->array_size;
+        default:
+            error("unknown type(get_size_of): %d", type->ty);
+    }
+}
+
+// 型のアラインメント
+int get_alignment(Type *type) {
+    switch (type->ty) {
+        case INT:
+            return 4;
+        case PTR:
+            return 8;
+        case ARRAY:
+            return get_alignment(type->ptrof);
+        default:
+            error("unknown type(get_alignment): %d", type->ty);
+    }
+}
+
 Type *assign_type_to_lval(Node *node);
 
 // 式に型をつける

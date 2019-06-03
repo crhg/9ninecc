@@ -61,6 +61,8 @@ extern Type int_type;
 Type *pointer_of(Type *type);
 Type *array_of(Type *type, int size);
 int type_eq(Type *x, Type *y);
+int get_size_of(Type *type);
+int get_alignment(Type *type);
 
 // ローカル変数
 typedef struct LocalVar {
@@ -69,10 +71,11 @@ typedef struct LocalVar {
 } LocalVar;
 
 // ノードの型を表す値
-enum {
+typedef enum NodeType {
     ND_NUM = 256, // 整数のノードの型
     ND_IDENT,     // 識別子
     ND_LOCAL_VAR,
+    ND_GLOBAL_VAR,
     ND_PTR,
     ND_PTR_OF,
     ND_RETURN,    // return
@@ -84,10 +87,12 @@ enum {
     ND_CALL,      // 関数呼び出し
     ND_FUNC,      // 関数定義
     ND_LOCAL_VAR_DEF,
+    ND_GLOBAL_VAR_DEF,
+    ND_PROGRAM,
     ND_EQ,        // ==
     ND_NE,        // !=
     ND_LE,        // <=
-};
+} NodeType;
 
 // ノードの型
 typedef struct Node {
@@ -108,7 +113,9 @@ typedef struct Node {
     Map *local_var_map; // 関数定義のローカル変数マップ
     struct Node *ptrto;       // tyがND_PTRの時に使う
     struct Node *ptrof;       // tyがND_PTR_OFの時に使う
-    Type *type;        // 式であるときその値の型
+    Type *type;          // 式であるときその値の型(暗黙の配列ポインタ変換で変化する)
+    Type *variable_type; // 変数参照のとき変数自体の型(変わらない)
+    Vector *top_levels; // ND_PROGRAMのときのトップレベルのベクタ
 } Node;
 
 // 入力プログラム
@@ -155,8 +162,7 @@ void tokenize();
 Type *assign_type_to_expr(Node *node);
 
 // パーサ
-void program();
-extern Vector *functions;
+Node *program();
 extern Map *local_var_map;
 #define LOCAL_VAR(name) ((LocalVar *)map_get(local_var_map, name))
 #define LOCAL_VAR_AT(i) ((LocalVar *)map->vals->data[i])

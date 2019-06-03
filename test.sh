@@ -129,6 +129,9 @@ try_output_raw 1 'int main() { int a[10]; a[0] = 1; pr_int(a[0]);}'  test_source
 try_output_raw 1 'int main() { int a[10]; int *p; p = a; *p = 1; pr_int(a[0]);}'  test_source/print.c
 try_output_raw 1 'int main() { int a[10]; int *p; a[5] = 1; p = &a[5]; pr_int(*p);}'  test_source/print.c
 try_output_raw 5 'int main() { int a[10]; pr_int(&a[5] - a);}'  test_source/print.c
+try_output_raw 10 'int a;int f(int x){a=x;} int main() {f(10);pr_int(a);}'  test_source/print.c
+try_output_raw 100 'int g() {return 100;} int a;int f(int x){a=x;} int main() {f(g());pr_int(a);}'  test_source/print.c
+try_output_raw 10 'int a[10];int f(int x){a[3]=x;} int main() {f(10);pr_int(a[3]);}'  test_source/print.c
 
 
 echo OK

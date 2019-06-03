@@ -3,6 +3,15 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
+// グローバル変数のマップ
+// 名前->型
+Map *global_var_map;
+
+// グローバル変数を登録する
+void new_global_var(char *name, Type *type) {
+    map_put(global_var_map, name, type);
+}
+
 // ローカル変数のマップ
 Map *local_var_map;
 
@@ -54,15 +63,27 @@ Node *new_node_num(int val, Token *token) {
 
 // 変数参照のノードを作る
 Node *new_node_var(Token *token) {
-    LocalVar *local_var = LOCAL_VAR(token->name);
-    if (local_var == NULL) {
-        error_at(token->input, "未定義の変数です");
+    Node *node;
+
+    char *name = token->name;
+    LocalVar *local_var = LOCAL_VAR(name);
+    if (local_var != NULL) {
+        node = new_node(ND_LOCAL_VAR, token);
+        node->local_var = local_var;
+        node->type = local_var->type;
+        node->variable_type = local_var->type;
+        return node;
     }
 
-    Node *node = new_node(ND_LOCAL_VAR, token);
-    node->local_var = local_var;
-    node->type = local_var->type;
-    return node;
+    Type *type = (Type *)map_get(global_var_map, name);
+    if (type != NULL) {
+        node = new_node(ND_GLOBAL_VAR, token);
+        node->type = type;
+        node->variable_type = type;
+        return node;
+    }
+
+    error_at(token->input, "未定義の変数です");
 }
 
 // 足し算のノードを作る
@@ -105,7 +126,7 @@ Node *new_node_ptr(Node *pt, Token *token) {
 
 // lvalueか判定
 int is_lvalue(Node * node) {
-    if (node->ty == ND_LOCAL_VAR) {
+    if (node->ty == ND_LOCAL_VAR || node->ty == ND_GLOBAL_VAR) {
         return node->type->ty != ARRAY;;
     }
 
@@ -578,34 +599,6 @@ Node *stmt() {
     return node;
 }
 
-// 型のバイト数
-int get_size_of(Type *type) {
-    switch (type->ty) {
-        case INT:
-            return 4;
-        case PTR:
-            return 8;
-        case ARRAY:
-            return get_size_of(type->ptrof) * type->array_size;
-        default:
-            error("unknown type(get_size_of): %d", type->ty);
-    }
-}
-
-// 型のアラインメント
-int get_alignment(Type *type) {
-    switch (type->ty) {
-        case INT:
-            return 4;
-        case PTR:
-            return 8;
-        case ARRAY:
-            return get_alignment(type->ptrof);
-        default:
-            error("unknown type(get_alignment): %d", type->ty);
-    }
-}
-
 // マップの中のローカル変数にオフセットを割り当てる
 void allocate_local_var(Map *map) {
     int n = LOCAL_VAR_NUM;
@@ -677,21 +670,11 @@ Node *param_def() {
     }
 }
 
-//- <function> ::= int IDENT '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
-//  ただしパラメタはintかポインタのみ許される
-Node *function() {
+// 関数定義の後半部
+Node *function(Token *function_name, Type *type) {
     local_var_map = new_map();
     Node *node = new_node(ND_FUNC, NULL);
     node->params = new_vector();
-
-    if (!consume(TK_INT)) {
-        error_at(TOKEN(pos)->input, "intでないトークンです");
-    }
-
-    Token *function_name;
-    if ((function_name = consume(TK_IDENT)) == NULL) {
-        error_at(TOKEN(pos)->input, "識別子でないトークンです");
-    }
 
     node->token = function_name;
 
@@ -729,15 +712,72 @@ Node *function() {
     return node;
 }
 
-// 関数定義のベクター
-Vector *functions;
+// グローバル変数定義の補助関数
+Node *global_var_def(Token *name, Type *type) {
+    if (consume('[')) {
+        Node *size_expr = expr();
+        if (!consume(']')) {
+            error_at(TOKEN(pos)->input, "']'でないトークンです");
+        }
 
-//- <program> ::= <function>* EOF
-void program() {
-    functions = new_vector();
+        type = array_of(type, eval_constant_expr(size_expr));
+    }
+
+    if (!consume(';')) {
+        error_at(TOKEN(pos)->input, "';'でないトークンです");
+    }
+
+    new_global_var(name->name, type);
+
+    Node *node = new_node(ND_GLOBAL_VAR_DEF, name);
+    node->type = type;
+
+    return node;
+}
+
+// XXX: とりあえずこのくらいに制限しておく
+//- <top_level> ::= int '*'* IDENT (
+//-     '[' <expr> ']' ';'
+//-   " '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
+//- )
+//     *配列サイズは定数式でなければならない
+//     *パラメタはintかポインタのみ許される
+Node *top_level() {
+
+    if (!consume(TK_INT)) {
+        error_at(TOKEN(pos)->input, "intでないトークンです");
+    }
+
+    Type *type = &int_type;
+
+    while (consume('*')) {
+        type = pointer_of(type);
+    }
+
+    Token *name;
+    if ((name = consume(TK_IDENT)) == NULL) {
+        error_at(TOKEN(pos)->input, "識別子でないトークンです");
+    }
+
+    if (next_token_is('(')) {
+        return function(name, type);
+    }
+
+    return global_var_def(name, type);
+}
+
+
+//- <program> ::= <top_level>* EOF
+Node *program() {
+    Vector *top_levels = new_vector();
+    global_var_map = new_map();
 
     while (TOKEN(pos)->ty != TK_EOF) {
-        vec_push(functions, function());
+        vec_push(top_levels, top_level());
     }
+
+    Node *node = new_node(ND_PROGRAM, NULL);
+    node->top_levels = top_levels;
+    return node;
 }
 

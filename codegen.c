@@ -153,44 +153,63 @@ int  gen_lval(Node *node) {
         return node->ptrto->type->ty;;
     }
 
-    if (node->ty != ND_LOCAL_VAR)
-        error_at_node(node, "代入の左辺値が変数ではありません");
+    if (node->ty == ND_LOCAL_VAR) {
+        print_comment_start("gen_lval ND_LOCAL_VAR %s", node->token->name);
 
-    print_comment_start("gen_lval ND_LOCAL_VAR %s", node->token->name);
+        printf("  mov rax, rbp\n");
+        printf("  sub rax, %d #%s\n", node->local_var->offset, node->token->name);
+        printf("  push rax\n");
+        stack_push(8);
 
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d #%s\n", node->local_var->offset, node->token->name);
-    printf("  push rax\n");
-    stack_push(8);
+        print_comment_end("gen_lval ND_LOCAL_VAR %s", node->token->name);
 
-    print_comment_end("gen_lval ND_LOCAL_VAR %s", node->token->name);
+        return node->local_var->type->ty;
+    }
 
-    return node->local_var->type->ty;
+    if (node->ty == ND_GLOBAL_VAR) {
+        print_comment_start("gen_lval ND_GLOBAL_VAR %s", node->token->name);
+
+        printf("  lea rax, [rip + %s]\n", node->token->name);
+        printf("  push rax\n");
+        stack_push(8);
+
+        print_comment_end("gen_lval ND_GLOBAL_VAR %s", node->token->name);
+        return node->type->ty;
+    }
+
+    error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
 // コード生成
 void gen(Node *node) {
+    if (node->ty == ND_PROGRAM) {
+        for (int i = 0; i < node->top_levels->len; i++) {
+            gen(node->top_levels->data[i]);
+        }
+        return;
+    }
+
     if (node->ty == ND_NUM) {
         printf("  push %d # ND_NUM\n", node->val);
         stack_push(8);
         return;
     }
 
-    if (node->ty == ND_LOCAL_VAR) {
+    if (node->ty == ND_LOCAL_VAR || node->ty == ND_GLOBAL_VAR) {
         // 変数の読み出し
-        print_comment_start("gen ND_LOCAL_VAR %s", node->token->name);
+        print_comment_start("変数の読み出し %s", node->token->name);
 
         // アドレスを求める
         // XXX: 厳密には配列変数はlvalではないがアドレスは同じように求まる
         gen_lval(node);
 
-        if (node->local_var->type->ty == ARRAY) {
+        if (node->variable_type->ty == ARRAY) {
             // 配列ならアドレスを返すので何もしない
             print_comment("配列: %s", node->token->name);
         } else {
             print_comment("アドレスが求まったので読み出す");
             printf("  pop rax\n");
-            switch (node->local_var->type->ty) {
+            switch (node->variable_type->ty) {
                 case INT:
                     printf("  mov eax, [rax] # int %s\n", node->token->name);
                     break;
@@ -198,18 +217,28 @@ void gen(Node *node) {
                     printf("  mov rax, [rax] # ポインタ %s\n", node->token->name);
                     break;
                 default:
-                    error_at_node(node, "unknown type(codegen): %d", node->local_var->type->ty);
+                    error_at_node(node, "unknown type(codegen): %d", node->variable_type->ty);
             }
             printf("  push rax\n");
         }
 
-        print_comment_end("gen ND_LOCAL_VAR %s", node->token->name);
+        print_comment_end("変数の読み出し %s", node->token->name);
         return;
     }
 
     if (node->ty == ND_LOCAL_VAR_DEF) {
         // 変数定義
         // 今のところ何もしない
+        return;
+    }
+
+    if (node->ty == ND_GLOBAL_VAR_DEF) {
+        // グローバル変数定義
+        printf("  .comm %s,%d,%d\n",
+                node->token->name,
+                get_size_of(node->type),
+                get_alignment(node->type)
+              );
         return;
     }
 

@@ -35,15 +35,13 @@ int main(int argc, char **argv) {
     tokenize();
 
     // パース
-    program();
+    Node *prog = program();
 
     // アセンブリの前半部分を出力
     printf(".intel_syntax noprefix\n");
 
     // コード生成
-    for (int i = 0; i < functions->len; i++) {
-        gen(functions->data[i]);
-    }
+    gen(prog);
 
     return 0;
 }
