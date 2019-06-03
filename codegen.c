@@ -126,6 +126,9 @@ char * select_reg(int ty, Reg reg) {
         case INT:
             reg_size = SIZE32;
             break;
+        case CHAR:
+            reg_size = SIZE8;
+            break;
         default:
             error("不明な型: %d", ty);
     }
@@ -213,6 +216,9 @@ void gen(Node *node) {
                 case INT:
                     printf("  mov eax, [rax] # int %s\n", node->token->name);
                     break;
+                case CHAR:
+                    printf("  movsx eax, BYTE PTR [rax] # char %s\n", node->token->name);
+                    break;
                 case PTR:
                     printf("  mov rax, [rax] # ポインタ %s\n", node->token->name);
                     break;
@@ -256,6 +262,9 @@ void gen(Node *node) {
         switch (node->type->ty) {
             case INT:
                 printf("  mov eax, [rax]\n");
+                break;
+            case CHAR:
+                printf("  movsx eax, BYTE PTR [rax]\n");
                 break;
             case PTR:
                 printf("  mov rax, [rax]\n");
@@ -345,6 +354,8 @@ void gen(Node *node) {
             case INT:
                 printf("  mov [rax], edi\n");
                 break;
+            case CHAR:
+                printf("  mov [rax], dil\n");
             case PTR:
                 printf("  mov [rax], rdi\n");
                 break;
@@ -584,7 +595,7 @@ void gen(Node *node) {
         gen(node->rhs);
         print_comment("return from rhs");
 
-        if (node->lhs->type->ty == PTR && node->rhs->type->ty == INT) {
+        if (node->lhs->type->ty == PTR && (node->rhs->type->ty == INT || node->rhs->type->ty == CHAR)) {
             print_comment("pointer - int");
             assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
 

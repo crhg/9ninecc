@@ -30,6 +30,7 @@ enum {
     TK_ELSE,
     TK_WHILE,
     TK_FOR,
+    TK_CHAR,
     TK_INT,
     TK_SIZEOF,
     TK_EQ,        // ==
@@ -53,11 +54,12 @@ typedef enum IdType {
 
 // 型
 typedef struct Type {
-    enum { INT, PTR, ARRAY } ty;
+    enum { CHAR, INT, PTR, ARRAY } ty;
     struct Type *ptrof;
     int array_size;
 } Type;
 extern Type int_type;
+extern Type char_type;
 Type *pointer_of(Type *type);
 Type *array_of(Type *type, int size);
 int type_eq(Type *x, Type *y);

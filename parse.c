@@ -476,17 +476,26 @@ LocalVar *find_local_var(Node *node) {
     }
 }
 
-//- <local_var_def> ::= int <ptr_ident>
-Node *local_var_def() {
-    Token *token;
-    // 変数定義
-    if ((token = consume(TK_INT)) == NULL) {
-        error_at(TOKEN(pos)->input, "intではないトークンです");
+//- <type_spec> ::= int | char
+Type *type_spec() {
+    if (consume(TK_INT)) {
+        return &int_type;
     }
 
-    Node *node_ptr_ident = ptr_ident(&int_type);
+    if (consume(TK_CHAR)) {
+        return &char_type;
+    }
 
-    Node *node = new_node(ND_LOCAL_VAR_DEF, token);
+    error_at(TOKEN(pos)->input, "intまたはcharでないトークンです");
+}
+
+//- <local_var_def> ::= <type_spec> <ptr_ident>
+Node *local_var_def() {
+    Type *type = type_spec();
+
+    Node *node_ptr_ident = ptr_ident(type);
+
+    Node *node = new_node(ND_LOCAL_VAR_DEF, node_ptr_ident->token);
     node->lhs = node_ptr_ident; // 一応リンクしておくが今のところ使用しない
     node->local_var = find_local_var(node_ptr_ident);
     return node;
@@ -576,7 +585,7 @@ Node *stmt() {
         return node;
     }
 
-    if (next_token_is(TK_INT)) {
+    if (next_token_is(TK_INT) || next_token_is(TK_CHAR)) {
         node = local_var_def();
         if (!consume(';')) {
             error_at(TOKEN(pos)->input, "';'ではないトークンです");
@@ -736,19 +745,14 @@ Node *global_var_def(Token *name, Type *type) {
 }
 
 // XXX: とりあえずこのくらいに制限しておく
-//- <top_level> ::= int '*'* IDENT (
+//- <top_level> ::= <type_spec> '*'* IDENT (
 //-     '[' <expr> ']' ';'
 //-   " '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
 //- )
 //     *配列サイズは定数式でなければならない
 //     *パラメタはintかポインタのみ許される
 Node *top_level() {
-
-    if (!consume(TK_INT)) {
-        error_at(TOKEN(pos)->input, "intでないトークンです");
-    }
-
-    Type *type = &int_type;
+    Type *type = type_spec();
 
     while (consume('*')) {
         type = pointer_of(type);
@@ -780,4 +784,3 @@ Node *program() {
     node->top_levels = top_levels;
     return node;
 }
-

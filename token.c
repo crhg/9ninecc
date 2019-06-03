@@ -183,6 +183,12 @@ void tokenize() {
             continue;
         }
 
+        if (keyword(p, &np, "char")) {
+            push_token(TK_CHAR, p);
+            p = np;
+            continue;
+        }
+
         if (keyword(p, &np, "sizeof")) {
             push_token(TK_SIZEOF, p);
             p = np;

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
+Type char_type = { CHAR };
 Type int_type = { INT };
 
 // ポインタの型
@@ -41,6 +42,8 @@ int type_eq(Type *x, Type *y) {
 // 型のバイト数
 int get_size_of(Type *type) {
     switch (type->ty) {
+        case CHAR:
+            return 1;
         case INT:
             return 4;
         case PTR:
@@ -55,6 +58,8 @@ int get_size_of(Type *type) {
 // 型のアラインメント
 int get_alignment(Type *type) {
     switch (type->ty) {
+        case CHAR:
+            return 1;
         case INT:
             return 4;
         case PTR:
