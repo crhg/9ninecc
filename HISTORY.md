@@ -201,4 +201,47 @@ push, popしてるところにスタック追跡をばらまく。
 
 ポインタ同士の減算もよく調べたらできるのでちゃんと書いた。
 
+## 2019-06-02
 
+### [new_nodeを使うようにリファクタ](https://github.com/crhg/9ninecc/commit/778be018243e543b19d4fb6203b56426d042642d)
+
+Node構造体を直にmallocしているところが残っていたので`new_node()`を使うようにリファクタ。
+
+### [変数定義と式の型付けはパースしながら行うようにリファクタ](https://github.com/crhg/9ninecc/commit/b1b886f5d39dae53b3aa912bc7278d613e62c64a)
+
+型付けを後で行うようにしたのだが`sizeof`の実装で早くも不便になったので、やっぱりパースしながらやるように修正。今度は頭の中が整理されたのでなんとかなった。
+
+### [sizeof](https://github.com/crhg/9ninecc/commit/5d20f4f0be359d128ffbffbfe118011dae37ad1e)
+
+リファクタしたのでわりとすんなり実装。
+
+### [配列型の定義](https://github.com/crhg/9ninecc/commit/31abf1d61ebffb16f872cee556814041d7dcca9c)
+
+ローカル変数領域の割り当てを雑に変数の数*×8にしていたが真面目に計算するようにした。
+
+配列型ができたのでアラインメントも計算する関数を作成。
+
+### [配列アクセス構文](https://github.com/crhg/9ninecc/commit/d7906bd94912e380987d1e4d69c1fee61f4aef50)
+
+`*`と`[]`の優先順位のため構文をいじった
+
+うっかり1ステップ飛ばしたけどこれは独立しているからまあいいか。
+
+## 2019-06-03
+
+### [配列からポインタへの暗黙の変換](https://github.com/crhg/9ninecc/commit/79bf000a07c174081d46a8f34ddffd14a0ad35b9)
+
+式の型を暗黙変換で書き換えるときに、うっかりTypeのtyだけ書き換えてはまる。全部のノードで共有されているので書き換えてはいけないものまで書き換わるのだった。毎回新たに生成するように修正。やや富豪的。
+
+### [グローバル変数](https://github.com/crhg/9ninecc/commits/master)
+
+構文解析までは難しくなかったが、どういうコードにすればいいか調べるのに手間取る。gccを参考にと書いてあるがgccの出力するアセンブラはデフォルトではインテル形式ではなかった。
+
+以下のどちらかで。
+
+```
+gcc -S -masm=intel hoge.c
+```
+```
+clang -S -mllvm --x86-asm-syntax=intel hoge.c
+```
