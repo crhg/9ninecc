@@ -266,3 +266,124 @@ clang -S -mllvm --x86-asm-syntax=intel hoge.c
 
 調べたところPLTはProcedure Linkage Tableの略で、たぶん直接飛ぶようにリンクすると遠すぎてだめだったのがテーブル経由だと大丈夫とかそんな感じじゃないかと。
 テーブル経由するので近いときは直接飛ぶコードに比べて若干遅くなるだろうけどとりあえず気にしないで全部`@PLT`つきでコード生成することに。
+
+### [入力をファイルから読む](https://github.com/crhg/9ninecc/commit/f52ae44d7d18cea861713381821f77a94bd9e77e)
+
+ほぼコピペ。テストスクリプトで引数で直接渡していたコードを`echo`で`tmp.c`に書き込むようにしたぐらい。
+
+### [コメント](https://github.com/crhg/9ninecc/commit/fc9e186feea9dcd8f8d12efbfcb0b39d32377c83)
+
+ほぼコピペ。行コメントのテストがいまの`test.sh`だと面倒なのでさぼった。すぐにCで書き換えがあるのでそのときに。
+
+### テストをCで書き直す
+
+けっこう大がかりになったので分割。
+
+#### [テスト用補助ファイルの関数名衝突を解消](https://github.com/crhg/9ninecc/commit/5aea7f9206d8f9452c6ef7cdb6af57a355a8b34d)
+
+テストから呼ぶちょっとした補助用Cコードの関数名がぶつからないように修正
+
+#### [test.shを対応するCコードに変換する使い捨てスクリプト](https://github.com/crhg/9ninecc/commit/97faa0aeeccecb554bf6cfd322373295741b3b88)
+
+手で書き直すのは面倒なのでperlスクリプトで変換する。ただし完璧なのを作るのは大変なのである程度は手作業前提。
+インデントは`clang-format`通せばいいので雑にやる。
+
+だいたいこんな感じに変換する。
+
+`@try_ret`や`@try_out`はあとでこれらを呼び出すmain関数を生成するスクリプトで使う予定。
+
+```bash
+ry 42 "42;"
+try_output 1-2-3-4-5-6-7-8 "foo3(1,2,3,4,5,6,7,8);" test_source/test3.c
+try_output_raw "5" "int main(){pr_int(add(2,3));} int add(int a,int b){return a+b;}" test_source/print.c
+```
+
+```C
+// @try_ret test1 42
+int test1() { 42; }
+// @end
+
+// @try_out test41 1-2-3-4-5-6-7-8
+int test41() { foo3(1, 2, 3, 4, 5, 6, 7, 8); }
+// @end
+
+// @try_out test42 "5"
+int test42() { pr_int(add(2, 3)); }
+int add(int a, int b) { return a + b; }
+// @end
+```
+
+#### [変換したテストソースを関数名の衝突などを手当てしたもの](https://github.com/crhg/9ninecc/commit/34054879f645852681119ddb8070d10f2831de53)
+
+変換スクリプトは`main()`だったのを`test<通番>()`に置き換えるまでは面倒見るけどそれ以上はしないので、他の関数名やグローバル変数名が衝突するときは結果を見て手で直す。
+
+#### [既にあった補助ファイルを手直し](https://github.com/crhg/9ninecc/commit/f218b6bfa409fd4f8e5e856e8fc0359528d1c709)
+
+`printf`を作成予定の`try_printf`に置き換える。結果をメモリに保存して比較するのに使う予定。
+
+#### [Cで書いたテストのサポートツール](https://github.com/crhg/9ninecc/commit/2a297d5f7ce78c9b20e99205501c63504268c4da)
+
+`test.c`から以下のように`main()`を生成する。
+
+```C
+#include "try.h"
+
+void main(int argc, char **argv) {
+  extern int test1();
+  try_ret(42, test1(), "test1");
+
+  extern int test41();
+  try_out_start();
+  test41();
+  try_out_check("1-2-3-4-5-6-7-8", "test41");
+
+  extern int test42();
+  try_out_start();
+  test42();
+  try_out_check("5", "test42");
+
+  printf("OK\n");
+  exit(0);
+}
+
+```
+
+文字列出力の場合は最初は固定バッファで行こうかと思ったけどマニュアルをみたら最近は`vasprintf`なる便利なものがあるらしいので使おうとしたらGNU拡張がなんとかいわれてうまくいかず断念。
+固定バッファに書き換えるのも何なので`snprintf`+`realloc`で実装。`snprintf`は切り詰めたかどうか返してくれないのが微妙に不便。
+
+### [C版テストで発覚した型を間違えて書き込む問題の修正](https://github.com/crhg/9ninecc/commit/f7833619adc6ab5e241da9464e7bcbf80dca894d)
+
+C版のテストプログラムを実行させるとSEGVする。調べると最後のテスト関数までは実行されていて戻るときにおかしいらしい。
+なんとなくmainの戻り番地あたりのスタックを壊している予感だがどこで壊しているのかわからないのでコメントアウト2分法で問題のあるテストを特定する。
+これだと判明。
+
+```C
+// @try_ret test79 3
+int test79() {
+  char x[3];
+  x[0] = -1;
+  x[1] = 2;
+  int y;
+  y = 4;
+  return x[0] + y;
+}
+```
+
+9nineccの生成したアセンブラソースとにらめっこして、charだから
+
+```
+  mov [rax], dil
+```
+
+であるべきところが、ポインタ用の
+
+```
+  mov [rax], rdi
+```
+
+になっていた。`x`はスタックの戻り番地のすぐ上に3バイトで割り付けられているので、8バイト書いたら書きつぶしますわな。
+
+型の受け渡しがおかしいっぽいのでどこでおかしくなるのか特定するのにデバッグ出力をばらまくなどしてかなり苦戦した。
+
+
+
