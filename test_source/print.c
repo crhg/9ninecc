@@ -1,9 +1,9 @@
-#include <stdio.h>
+#include "try.h"
 
 void pr_int(int n) {
-    printf("%d", n);
+    try_printf("%d", n);
 }
 
 void pr_nl() {
-    printf("\n");
+    try_printf("\n");
 }

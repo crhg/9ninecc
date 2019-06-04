@@ -1,5 +1,5 @@
-#include <stdio.h>
+#include "try.h"
 
 void foo1() {
-    printf("OK\n");
+    try_printf("OK\n");
 }
