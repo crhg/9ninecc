@@ -68,6 +68,8 @@ Type *array_of(Type *type, int size);
 int type_eq(Type *x, Type *y);
 int get_size_of(Type *type);
 int get_alignment(Type *type);
+char *tyToStr(int ty);
+char *typeToStr(Type *type);
 
 // ローカル変数
 typedef struct LocalVar {
@@ -81,8 +83,8 @@ typedef enum NodeType {
     ND_IDENT,     // 識別子
     ND_LOCAL_VAR,
     ND_GLOBAL_VAR,
-    ND_PTR,
-    ND_PTR_OF,
+    ND_DEREF,
+    ND_GET_PTR,
     ND_RETURN,    // return
     ND_IF,
     ND_WHILE,
@@ -117,8 +119,8 @@ typedef struct Node {
     char *name;        // tyがND_CALLの時に使う識別子名
     Vector *params;    // tyがND_CALLの時に使うパラメタの式のベクタ
     Map *local_var_map; // 関数定義のローカル変数マップ
-    struct Node *ptrto;       // tyがND_PTRの時に使う
-    struct Node *ptrof;       // tyがND_PTR_OFの時に使う
+    struct Node *ptrto;       // tyがND_DEREFの時に使う
+    struct Node *ptrof;       // tyがND_GET_PTRの時に使う
     Type *type;          // 式であるときその値の型(暗黙の配列ポインタ変換で変化する)
     Type *variable_type; // 変数参照のとき変数自体の型(変わらない)
     Vector *top_levels; // ND_PROGRAMのときのトップレベルのベクタ
@@ -167,6 +169,9 @@ void print_node_pos(Node *node);
 
 // ファイルを読み込む
 char *read_file(char *path);
+
+// 文字列領域を確保するsprintf
+char *strprintf(char *fmt, ...);
 
 // user_inputが指している文字列を
 // トークンに分割して保存する

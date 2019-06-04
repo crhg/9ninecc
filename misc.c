@@ -120,4 +120,54 @@ char *read_file(char *path) {
   return buf;
 }
 
+// 結果文字列の領域を自分で用意するsprintf
+/* char *strprintf(char *fmt, ...) { */
+/*     va_list ap; */
+/*     va_start(ap, fmt); */
+/*  */
+/*     size_t size = 16; */
+/*     char *s = malloc(size); */
+/*     if (s == NULL) { */
+/*         perror("strprintf: malloc"); */
+/*     } */
+/*  */
+/*     for (;;) { */
+/*         fprintf(stderr, "s=%lx, size=%ld\n", (size_t)s, size); */
+/*         s[size-1] = 0; */
+/*         fprintf(stderr, "touch ok\n"); */
+/*  */
+/*  */
+/*         fprintf(stderr, "vsnprintf s=%lx, size=%ld, fmt=%s, result=", (size_t)s, size, fmt); */
+/*         int l = vfprintf(stderr, fmt, ap); */
+/*         fprintf(stderr, ", len=%d\n", l); */
+/*  */
+/*         int len = vsnprintf(s, size, fmt, ap); */
+/*         fprintf(stderr, "vsprintf OK\n"); */
+/*         if (len <= size -2) */
+/*             return s; */
+/*  */
+/*         size *= 2; */
+/*         s = realloc(s, size); */
+/*         if (s == NULL) { */
+/*             perror("strprintf: realloc"); */
+/*         } */
+/*     } */
+/* } */
+// 何故かSEGVするので簡易実装
+// 上限1023文字
+char *strprintf(char *fmt, ...) {
+    char buf[1024];
 
+    va_list ap;
+    va_start(ap, fmt);
+
+    int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+
+    char *s = malloc(len+1);
+    if (s == NULL) {
+        perror("strprintf: malloc");
+    }
+
+    strcpy(s, buf);
+    return s;
+}

@@ -8,6 +8,9 @@ int label_seq = 0;
 // コメントレベル
 int comment_level = 0;
 
+// コメントのレベル毎インデントの深さ
+#define COMMENT_INDENT 4
+
 // コメントレベルを出力
 void print_comment_level(char c) {
     for (int i = 1; i <= comment_level; i++) {
@@ -33,7 +36,7 @@ void vprint_comment(char c, char *fmt, va_list args) {
 
 // コメント開始出力
 void print_comment_start(char *fmt, ...) {
-    comment_level+=2;
+    comment_level+=COMMENT_INDENT;
 
     va_list ap;
     va_start(ap, fmt);
@@ -53,7 +56,7 @@ void print_comment_end(char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     vprint_comment('<', fmt, ap);
-    comment_level -= 2;
+    comment_level -= COMMENT_INDENT;
 }
 
 // スタック位置
@@ -65,8 +68,19 @@ void stack_push(int size) {
 }
 
 // スタックにsizeバイトをpopしたことを記録する
-void stack_pop(int size) {
+void stack_pop(int size, Node *node) {
     stack_ptr -= size;
+
+    if (stack_ptr < 0) {
+        error_at_node(node, "stack_ptr < 0!!");
+    }
+}
+
+// スタックが空であることをチェックする
+void assert_stack_empty(Node *node) {
+    if (stack_ptr != 0) {
+        error_at_node(node, "stack_ptr != 0 !!");
+    }
 }
 
 // スタック調整
@@ -87,10 +101,10 @@ int adjust_stack(int param_stack_size) {
 
 // 関数呼び出し後のスタックの回復
 // sizeはスタック調整量+スタック渡しのパラメタのサイズ合計
-void restore_stack(int size) {
+void restore_stack(int size, Node *node) {
     if (size != 0) {
         printf("  add rsp, %d\n", size);
-        stack_pop(size);
+        stack_pop(size, node);
     }
 }
 
@@ -166,26 +180,30 @@ void gen_strings(Vector *strings) {
 // 型を返す
 // XXX: 厳密には配列変数はlvalではないがアドレスは同じように求まるので使用可能
 int  gen_lval(Node *node) {
-    if (node->ty == ND_PTR) {
+    if (node->ty == ND_DEREF) {
+        print_comment_start("gen_lval ND_LOCAL_VAR PTR to type=%s", typeToStr(node->ptrto->type));
         gen(node->ptrto);
-        return node->ptrto->type->ty;;
+        print_comment_end("gen_lval ND_LOCAL_VAR");
+        return node->type->ty;
     }
 
     if (node->ty == ND_LOCAL_VAR) {
-        print_comment_start("gen_lval ND_LOCAL_VAR %s", node->token->name);
+        print_comment_start("gen_lval ND_LOCAL_VAR %s type=%s", node->token->name, typeToStr(node->type));
 
         printf("  mov rax, rbp\n");
         printf("  sub rax, %d #%s\n", node->local_var->offset, node->token->name);
         printf("  push rax\n");
         stack_push(8);
 
+        print_comment("return type=%s", typeToStr(node->local_var->type));
         print_comment_end("gen_lval ND_LOCAL_VAR %s", node->token->name);
 
-        return node->local_var->type->ty;
+        /* return node->local_var->type->ty; */
+        return node->type->ty;
     }
 
     if (node->ty == ND_GLOBAL_VAR) {
-        print_comment_start("gen_lval ND_GLOBAL_VAR %s", node->token->name);
+        print_comment_start("gen_lval ND_GLOBAL_VAR %s type=%s", node->token->name, typeToStr(node->type));
 
         printf("  lea rax, [rip + %s]\n", node->token->name);
         printf("  push rax\n");
@@ -205,6 +223,7 @@ void gen(Node *node) {
 
         for (int i = 0; i < node->top_levels->len; i++) {
             gen(node->top_levels->data[i]);
+            assert_stack_empty(node->top_levels->data[i]);
         }
         return;
     }
@@ -250,6 +269,7 @@ void gen(Node *node) {
                     error_at_node(node, "unknown type(codegen): %d", node->variable_type->ty);
             }
             printf("  push rax\n");
+            // popしてpushだから差し引き0
         }
 
         print_comment_end("変数の読み出し %s", node->token->name);
@@ -272,15 +292,15 @@ void gen(Node *node) {
         return;
     }
 
-    if (node->ty == ND_PTR) {
-        print_comment_start("ND_PTR");
+    if (node->ty == ND_DEREF) {
+        print_comment_start("ND_DEREF");
 
         gen(node->ptrto);
-        print_comment("ND_PTR: ptrto compiled");
+        print_comment("ND_DEREF: ptrto compiled");
 
         printf("  pop rax\n");
         if (node->type == NULL) {
-            error_at_node(node, "ND_PTR: type is NULL\n");
+            error_at_node(node, "ND_DEREF: type is NULL\n");
         }
 
         switch (node->type->ty) {
@@ -294,17 +314,17 @@ void gen(Node *node) {
                 printf("  mov rax, [rax]\n");
                 break;
             default:
-                error_at_node(node, "unknown type at ND_PTR: %d\n", node->type->ty);
+                error_at_node(node, "unknown type at ND_DEREF: %d\n", node->type->ty);
         }
         printf("  push rax\n");
 
         // popしてpushなのでスタック増減はない
 
-        print_comment_end("ND_PTR");
+        print_comment_end("ND_DEREF");
         return;
     }
 
-    if (node->ty == ND_PTR_OF) {
+    if (node->ty == ND_GET_PTR) {
         gen_lval(node->ptrof);
         return;
     }
@@ -327,27 +347,27 @@ void gen(Node *node) {
         // レジスタ渡しするパラメタの処理
         if (node->params->len >= 1) {
             printf("  pop rdi\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[0]);
         }
         if (node->params->len >= 2) {
             printf("  pop rsi\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[1]);
         }
         if (node->params->len >= 3) {
             printf("  pop rdx\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[2]);
         }
         if (node->params->len >= 4) {
             printf("  pop rcx\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[3]);
         }
         if (node->params->len >= 5) {
             printf("  pop r8\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[4]);
         }
         if (node->params->len >= 6) {
             printf("  pop r9\n");
-            stack_pop(8);
+            stack_pop(8, node->params->data[5]);
         }
 
         // 浮動小数点パラメタの数
@@ -357,7 +377,7 @@ void gen(Node *node) {
         printf("  call %s@PLT\n", node->name);
 
         // スタック回復
-        restore_stack(adjusted + param_stack_size);
+        restore_stack(adjusted + param_stack_size, node);
 
         // 戻り値をスタックに積む
         printf("  push rax\n");
@@ -368,14 +388,19 @@ void gen(Node *node) {
     }
 
     if (node->ty == '=') {
-        print_comment_start("=");
+        print_comment_start("代入");
 
         // 代入
+        print_comment("代入: lhs計算");
         int ty = gen_lval(node->lhs);
+        print_comment("代入: lhs type = %s", tyToStr(ty));
+        print_comment("代入: rhs計算");
         gen(node->rhs);
 
+        print_comment("代入: ストア処理 ty=%s", tyToStr(ty));
         printf("  pop rdi\n");
         printf("  pop rax\n");
+        stack_pop(16, node);
 
         switch (ty) {
             case INT:
@@ -383,6 +408,7 @@ void gen(Node *node) {
                 break;
             case CHAR:
                 printf("  mov [rax], dil\n");
+                break;
             case PTR:
                 printf("  mov [rax], rdi\n");
                 break;
@@ -391,9 +417,9 @@ void gen(Node *node) {
         }
 
         printf("  push rdi\n"); // 全体の値は右辺の計算結果
-        stack_pop(8);
+        stack_push(8);
 
-        print_comment_end("=");
+        print_comment_end("代入");
         return;
     }
 
@@ -403,7 +429,7 @@ void gen(Node *node) {
         stack_ptr = 0;
         gen(node->lhs);
         printf("  pop rax\n");
-        stack_pop(8);
+        stack_pop(8, node);
 
         print_comment_end("ND_EXPR");
         return;
@@ -415,6 +441,8 @@ void gen(Node *node) {
         stack_ptr = 0;
         gen(node->lhs);
         printf("  pop rax\n");
+        stack_pop(8, node);
+        assert_stack_empty(node);
         printf("  mov rsp, rbp\n");
         printf("  pop rbp\n");
         printf("  ret\n");
@@ -433,6 +461,8 @@ void gen(Node *node) {
         if (node->else_stmt == NULL) {
             print_comment("without else");
             printf("  pop rax\n");
+            stack_pop(8, node);
+            assert_stack_empty(node);
             printf("  cmp rax, 0\n");
             printf("  je .Lend%d\n", seq);
             gen(node->stmt);
@@ -440,6 +470,8 @@ void gen(Node *node) {
         } else {
             print_comment("with else");
             printf("  pop rax\n");
+            stack_pop(8, node);
+            assert_stack_empty(node);
             printf("  cmp rax, 0\n");
             printf("  je .Lelse%d\n", seq);
             gen(node->stmt);
@@ -461,13 +493,15 @@ void gen(Node *node) {
         stack_ptr = 0;
         gen(node->cond);
         printf("  pop rax\n");
+        stack_pop(8, node->cond);
+        assert_stack_empty(node->cond);
         printf("  cmp rax, 0\n");
         printf("  je .Lend%d\n", seq);
         gen(node->stmt);
         printf("  jmp .Lbegin%d\n", seq);
         printf(".Lend%d:\n", seq);
 
-        print_comment_start("ND_WHILE");
+        print_comment_end("ND_WHILE");
         return;
     }
 
@@ -481,6 +515,8 @@ void gen(Node *node) {
             stack_ptr = 0;
             gen(node->init);
             printf("  pop rax\n");
+            stack_pop(8, node->init);
+            assert_stack_empty(node->init);
         }
         printf(".Lbegin%d:\n", seq);
         if (node->cond != NULL) {
@@ -489,6 +525,8 @@ void gen(Node *node) {
             stack_ptr = 0;
             gen(node->cond);
             printf("  pop rax\n");
+            stack_pop(8, node->cond);
+            assert_stack_empty(node->cond);
             printf("  cmp rax, 0\n");
             printf("  je .Lend%d\n", seq);
         }
@@ -498,6 +536,8 @@ void gen(Node *node) {
             stack_ptr = 0;
             gen(node->next);
             printf("  pop rax\n");
+            stack_pop(8, node->next);
+            assert_stack_empty(node->next);
         }
         printf("  jmp .Lbegin%d\n", seq);
         printf(".Lend%d:\n", seq);
@@ -513,6 +553,7 @@ void gen(Node *node) {
             print_comment("block %d", i);
 
             gen(node->stmts->data[i]);
+            assert_stack_empty(node->stmts->data[i]);
         }
 
         print_comment_end("ND_END");
@@ -582,16 +623,17 @@ void gen(Node *node) {
     }
 
     if (node->ty == '+') {
-        print_comment_start("+");
+        print_comment_start("+ type=%s", typeToStr(node->type));
         assert_at_node(node, node->lhs->type != NULL, "lhs type is null");
 
-        print_comment("lhs");
+        print_comment("lhs type=%s", typeToStr(node->lhs->type));
         gen(node->lhs);
-        print_comment("rhs");
+        print_comment("rhs type=%s", typeToStr(node->rhs->type));
         gen(node->rhs);
         print_comment("return from rhs");
 
         printf("  pop rax\n");
+        stack_pop(8, node->rhs);
         if (node->lhs->type->ty == PTR) {
             // lhsがポインタならポインタが指す型のサイズをrhsの整数値に掛けてから加算
             print_comment("pointer + int");
@@ -602,10 +644,11 @@ void gen(Node *node) {
         }
 
         printf("  pop rdi\n");
+        stack_pop(8, node->lhs);
         printf("  add rax, rdi\n");
 
         printf("  push rax\n");
-        stack_pop(8);
+        stack_push(8);
         print_comment_end("+");
         
         return;
@@ -627,10 +670,12 @@ void gen(Node *node) {
             assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
 
             printf("  pop rax\n");
+            stack_pop(8, node->rhs);
             printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof));
             printf("  imul rdi\n");
             printf("  mov rdi, rax\n");
             printf("  pop rax\n");
+            stack_pop(8, node->lhs);
             printf("  sub rax, rdi\n");
         } else if (node->lhs->type->ty == PTR && node->rhs->type->ty == PTR) {
             // 結果をポインタの指す型のサイズで割り算する
@@ -638,7 +683,9 @@ void gen(Node *node) {
             assert_at_node(node, node->lhs->type->ptrof != NULL, "lhs->type->ptrof is null");
 
             printf("  pop rdi\n");
+            stack_pop(8, node->rhs);
             printf("  pop rax\n");
+            stack_pop(8, node->lhs);
             printf("  sub rax, rdi\n");
             printf("  mov rdi, %d\n", get_size_of(node->lhs->type->ptrof));
             printf("  cqo\n");
@@ -646,12 +693,14 @@ void gen(Node *node) {
         } else {
             print_comment("int - int");
             printf("  pop rdi\n");
+            stack_pop(8, node->rhs);
             printf("  pop rax\n");
+            stack_pop(8, node->lhs);
             printf("  sub rax, rdi\n");
         }
 
         printf("  push rax\n");
-        stack_pop(8);
+        stack_push(8);
         print_comment_end("-");
         return;
     }
@@ -667,7 +716,9 @@ void gen(Node *node) {
     print_comment("return from rhs");
 
     printf("  pop rdi\n");
+    stack_pop(8, node->rhs);
     printf("  pop rax\n");
+    stack_pop(8, node->lhs);
 
     switch (node->ty) {
     case '*':
@@ -709,7 +760,7 @@ void gen(Node *node) {
     }
 
     printf("  push rax\n");
-    stack_pop(8);
+    stack_push(8);
 
     print_comment_end("binop");
 }

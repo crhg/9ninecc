@@ -111,8 +111,7 @@ Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
         lhs = tmp;
     }
 
-    // XXX: INTとPTRしかないのでこの判定
-    if (rhs->type->ty != INT) {
+    if (rhs->type->ty == PTR) {
         error_at_token(token, "加算できない型の組み合わせです");
     }
 
@@ -129,7 +128,7 @@ Node *new_node_ptr(Node *pt, Token *token) {
         error_at_node(pt, "ポインタ型でありません");
     }
 
-    Node *node = new_node(ND_PTR, token);
+    Node *node = new_node(ND_DEREF, token);
     node->ptrto = pt;
     node->type = pt->type->ptrof;
 
@@ -142,7 +141,7 @@ int is_lvalue(Node * node) {
         return node->type->ty != ARRAY;;
     }
 
-    if (node->ty == ND_PTR) {
+    if (node->ty == ND_DEREF) {
         return 1;
     }
 
@@ -248,7 +247,7 @@ Node *pointer_term() {
             error_at_node(pt, "lvalueでありません: %d", pt->ty);
         }
 
-        Node *node = new_node(ND_PTR_OF, token);
+        Node *node = new_node(ND_GET_PTR, token);
         node->ptrof = pt;
         node->type = pointer_of(pt->type);
         return node;
@@ -338,7 +337,7 @@ Node *add() {
             // XXX: INTとPTRしかないのでこの判定
             if (lhs->type->ty == PTR && type_eq(lhs->type, rhs->type)) {
                 node->type = &int_type;
-            } else if (rhs->type->ty == INT) {
+            } else if (rhs->type->ty == INT || rhs->type->ty == CHAR) {
                 node->type = lhs->type;
             } else {
                 error_at_token(token, "減算できない型の組み合わせです");
@@ -461,7 +460,7 @@ Node *ptr_ident(Type *type) {
 
     Token *token;
     if ((token = consume('*'))) {
-        node = new_node(ND_PTR, token);
+        node = new_node(ND_DEREF, token);
         node->ptrto = ptr_ident(pointer_of(type));
         node->type = type;
         return node;

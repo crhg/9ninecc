@@ -71,6 +71,33 @@ int get_alignment(Type *type) {
     }
 }
 
+// tyの文字列表記
+char *tyToStr(int ty) {
+    switch (ty) {
+        case CHAR:
+            return "char";
+        case INT:
+            return "int";
+        case PTR:
+            return "ptr";
+        case ARRAY:
+            return "array";
+        default:
+            error("unknown type(tyToStr): %d", ty);
+    }
+}
+// 型の文字列表記
+char *typeToStr(Type *type) {
+    switch (type->ty) {
+        case PTR:
+            return strprintf("ptr of %s", typeToStr(type->ptrof));
+        case ARRAY:
+            return strprintf("array of %s", typeToStr(type->ptrof));
+        default:
+            return tyToStr(type->ty);
+    }
+}
+
 Type *assign_type_to_lval(Node *node);
 
 // 式に型をつける
@@ -94,7 +121,7 @@ Type *assign_type_to_expr(Node *node) {
                 // TODO: パラメタの型チェック
             }
             return &int_type;
-        case ND_PTR_OF:
+        case ND_GET_PTR:
             type = assign_type_to_lval(node->ptrof);
             return node->type = pointer_of(type);
         case '=':
@@ -162,9 +189,9 @@ Type *assign_type_to_lval(Node *node) {
     switch (node->ty) {
         case ND_LOCAL_VAR:
             return node->type = node->local_var->type;
-        case ND_PTR:
+        case ND_DEREF:
             /* print_node_pos(node); */
-            /* fprintf(stderr, "assign type ND_PTR\n"); */
+            /* fprintf(stderr, "assign type ND_DEREF\n"); */
             type = assign_type_to_expr(node->ptrto);
             if (type->ty != PTR) {
                 error_at_node(node->ptrto, "ポインタ型ではありません");
