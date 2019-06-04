@@ -2,3 +2,6 @@
 *.o
 tmp*
 9ninecc
+*.bak
+test_source/test.s
+test_source/test_main.c
