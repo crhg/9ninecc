@@ -139,7 +139,7 @@ Node *new_node_ptr(Node *pt, Token *token) {
 // lvalueか判定
 int is_lvalue(Node * node) {
     if (node->ty == ND_LOCAL_VAR || node->ty == ND_GLOBAL_VAR) {
-        return node->type->ty != ARRAY;;
+        return node->type->ty != ARRAY;
     }
 
     if (node->ty == ND_DEREF) {
@@ -174,10 +174,10 @@ Node *term() {
 
     if ((token = consume(TK_STRING)) != NULL) {
         int index = new_string(token->str);
-        Node *node = new_node(ND_STRING, token);
-        node->str_index = index;
-        node->type = pointer_of(&char_type);
-        return node;
+        Node *stringNode = new_node(ND_STRING, token);
+        stringNode->str_index = index;
+        stringNode->type = pointer_of(&char_type);
+        return stringNode;
     }
 
     if ((token = consume(TK_IDENT)) != NULL) {
@@ -686,18 +686,6 @@ void dump_local_var(Map *map) {
     }
 
     printf("# end\n");
-}
-
-Node *param_def() {
-    Node *node = local_var_def();
-
-    switch (node->local_var->type->ty) {
-        case INT:
-        case PTR:
-            return node;
-        default:
-            error_at_node(node, "パラメタはINTかポインタでなければなりません");
-    }
 }
 
 //          (http://port70.net/~nsz/c/c11/n1570.html#6.7.6)
