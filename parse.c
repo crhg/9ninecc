@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "9ninecc.h"
 
 // グローバル変数のマップ
@@ -474,7 +475,7 @@ Node *ptr_ident(Type *type) {
                 error_at(TOKEN(pos)->input, "']'でないトークンです");
             }
 
-            type = array_of(type, eval_constant_expr(size_expr));
+            type = array_of(type, eval_constant_expr(size_expr), 0);
         }
 
         node = new_node(ND_IDENT, id);
@@ -699,6 +700,104 @@ Node *param_def() {
     }
 }
 
+//          (http://port70.net/~nsz/c/c11/n1570.html#6.7.6)
+//          declarator:
+//                 pointeropt direct-declarator
+//          direct-declarator:
+//                  identifier
+//                  ( declarator )
+//                  direct-declarator [ type-qualifier-listopt assignment-expressionopt ]
+//                  direct-declarator [ static type-qualifier-listopt assignment-expression ]
+//                  direct-declarator [ type-qualifier-list static assignment-expression ]
+//                  direct-declarator [ type-qualifier-listopt * ]
+//                  direct-declarator ( parameter-type-list )
+//                  direct-declarator ( identifier-listopt )
+//          pointer:
+//                 * type-qualifier-listopt
+//                 * type-qualifier-listopt pointer
+//          type-qualifier-list:
+//                 type-qualifier
+//                 type-qualifier-list type-qualifier
+//          parameter-type-list:
+//                parameter-list
+//                parameter-list , ...
+//          parameter-list:
+//                parameter-declaration
+//                parameter-list , parameter-declaration
+//          parameter-declaration:
+//                declaration-specifiers declarator
+//                declaration-specifiers abstract-declaratoropt
+//          identifier-list:
+//                 identifier
+//                 identifier-list , identifier
+Declarator *declarator();
+
+Declarator *param_decl() {
+    Type *type = type_spec();
+    return declarator(type);
+}
+
+Declarator *direct_declarator(Type *type) {
+    Token *id;
+    Declarator *decl;
+
+    if (consume('(')) {
+        decl = declarator(NULL);
+        if (!consume(')')) {
+            error_at(TOKEN(pos)->input, "'('でないトークンです(direct_declarator)");
+        }
+    } else if ((id = consume(TK_IDENT)) != NULL) {
+        decl = malloc(sizeof(Declarator));
+        decl->id = id;
+    } else {
+        error_at(TOKEN(pos)->input, "識別子でも'('でもないトークンです(direct_declarator)");
+    }
+
+    for (;;) {
+        if (consume('[')) {
+            if (next_token_is(']')) {
+                type = array_of(type, 0, 1);
+            } else {
+                Node *e = expr();
+                size_t size = eval_constant_expr(e);
+                type = array_of(type, size, 0);
+            }
+
+            if (!consume(']')) {
+                error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
+            }
+        } else if (consume('(')) {
+            // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
+            // TODO: ...には対応していない
+            // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
+            Vector *params = new_vector();
+            if (!next_token_is(']')) {
+                vec_push(params, param_decl());
+                while (consume(',')) {
+                    vec_push(params, param_decl());
+                }
+            }
+
+            if (!consume(')')) {
+                error_at(TOKEN(pos)->input, "')'でないトークンです(direct_declarator)");
+            }
+
+            type = function_of(type, params);
+        }
+    }
+
+    decl->type = type;
+    return decl;
+}
+
+Declarator *declarator(Type *type) {
+    if (consume('*')) {
+        return declarator(pointer_of(type));
+    }
+
+    return direct_declarator(type);
+}
+
 // 関数定義の後半部
 Node *function(Token *function_name, Type *type) {
     local_var_map = new_map();
@@ -741,53 +840,179 @@ Node *function(Token *function_name, Type *type) {
     return node;
 }
 
-// グローバル変数定義の補助関数
-Node *global_var_def(Token *name, Type *type) {
-    if (consume('[')) {
-        Node *size_expr = expr();
-        if (!consume(']')) {
-            error_at(TOKEN(pos)->input, "']'でないトークンです");
+int get_initalizer_size(Initializer *init, int level) {
+    if (init == NULL) { return -1; }
+
+    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty ==ND_STRING && level == 0) {
+        return strlen(init->expr->token->str) + 1;
+    }
+
+    if (init->ty == INITIALIZER_TYPE_LIST) {
+        if (level == 0) {
+            return init->list->len;
         }
 
-        type = array_of(type, eval_constant_expr(size_expr));
+        int ret = 0;
+        for (int i = 0; i < init->list->len; i++) {
+            int size = get_initalizer_size(init->list->data[i], level - 1);
+            if (size < 0) { return -1; }
+            if (size > ret) {
+                ret = size;
+            }
+        }
+
+        return ret;
     }
 
-    if (!consume(';')) {
-        error_at(TOKEN(pos)->input, "';'でないトークンです");
+    return -1;
+}
+
+void determine_array_size(Type *type, Initializer *init) {
+    int level = 0;
+    while (type->ty == ARRAY && type->incomplete_size) {
+        int size = get_initalizer_size(init, level);
+        if (size < 0) {
+            error("配列の要素数が確定しません");
+        }
+        type->array_size = size;
+        type->incomplete_size = 0;
+
+        type = type->ptrof;
+        level++;
+    }
+}
+
+Node *global_var_def(Declarator *decl, Initializer *init) {
+    if (decl->type->ty == FUNC) {
+        error_at_token(decl->id, "関数型の変数は定義できません");
     }
 
-    new_global_var(name->name, type);
+    new_global_var(decl->id->name, decl->type);
 
-    Node *node = new_node(ND_GLOBAL_VAR_DEF, name);
-    node->type = type;
+    Node *node = new_node(ND_GLOBAL_VAR_DEF, decl->id);
+    node->type = decl->type;
+    node->initializer = init;
+
+    determine_array_size(decl->type, init);
 
     return node;
 }
 
-// XXX: とりあえずこのくらいに制限しておく
-//- <top_level> ::= <type_spec> '*'* IDENT (
-//-     '[' <expr> ']' ';'
-//-   " '(' (<local_var_def> (',' <local_var_def>)*)? ')' <block>
-//- )
+Node *init_declarator(Declarator *decl, Initializer *init) {
+    // いまのところはグローバル変数の定義だけ
+    // そのうちtypedefとかも
+    return global_var_def(decl, init);
+}
+
+//- <top_level> ::=
+//-     <type_spec> <declarator> <block>
+//-   | <type_spec> <declarator> ('=' <initializer>)?  (',' <declarator> ('=' <initializer>)? )* ';'
+//
 //     *配列サイズは定数式でなければならない
 //     *パラメタはintかポインタのみ許される
-Node *top_level() {
-    Type *type = type_spec();
+//
+//          (http://port70.net/~nsz/c/c11/n1570.html#6.9)
+//          translation-unit:
+//                  external-declaration
+//                  translation-unit external-declaration
+//          external-declaration:
+//                 function-definition
+//                 declaration
+//
+//          (http://port70.net/~nsz/c/c11/n1570.html#6.9.1)
+//          function-definition:
+//                 declaration-specifiers declarator declaration-listopt compound-statement
+//          declaration-list: # 関数のパラメタの型の古い書き方 int f(x) int x; {...} みたいな奴
+//                 declaration
+//                 declaration-list declaration
+//
+//          (http://port70.net/~nsz/c/c11/n1570.html#6.7)
+//          declaration:
+//                 declaration-specifiers init-declarator-listopt ;
+//                 static_assert-declaration
+//          declaration-specifiers:
+//                 storage-class-specifier declaration-specifiersopt # typedef, extern, static, auto, register, _Thread_local
+//                 type-specifier declaration-specifiersopt # void, char, int, struct..., union..., enum..., ...
+//                 type-qualifier declaration-specifiersopt # const, restrict, volatile, _Atomic
+//                 function-specifier declaration-specifiersopt # include, _Noreturn
+//                 alignment-specifier declaration-specifiersopt # _Alignas (...)
+//          init-declarator-list:
+//                  init-declarator
+//                  init-declarator-list , init-declarator
+//          init-declarator:
+//                  declarator
+//                  declarator = initializer
 
-    while (consume('*')) {
-        type = pointer_of(type);
+// 関数のパラメタとして使える型かどうか
+int is_allowed_as_param(Type *type) {
+    switch (type->ty) {
+        case CHAR:
+        case INT:
+        case PTR:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+void register_param_as_local_var(Map *map, Vector *params) {
+    for (int i = 0; i < params->len; params++) {
+        Declarator *decl = (Declarator *)params->data[i];
+
+        if (!is_allowed_as_param(decl->type)) {
+            error_at_token(decl->id, "パラメタとして許されない型です: %s", typeToStr(decl->type));
+        }
+
+        new_local_var(decl->id->name, decl->type);
+    }
+}
+
+Node *function_definition(Declarator *decl) {
+    Node *node = new_node(ND_FUNC, decl->id);
+
+    local_var_map = new_map();
+    register_param_as_local_var(local_var_map, decl->type->params);
+
+    node->stmt = block();
+    node->local_var_map = local_var_map;
+
+    allocate_local_var(local_var_map);
+    dump_local_var(local_var_map);
+
+    return node;
+}
+
+
+void top_level(Vector *top_levels) {
+    Type *type;
+    Declarator *decl;
+
+    type = type_spec();
+    decl = declarator(type);
+
+    if (next_token_is('{')) {
+        vec_push(top_levels, function_definition(decl));
+        return;
     }
 
-    Token *name;
-    if ((name = consume(TK_IDENT)) == NULL) {
-        error_at(TOKEN(pos)->input, "識別子でないトークンです");
-    }
+    for (;;) {
+        if (consume('=')) {
+            Initializer *init = initializer();
+            vec_push(top_levels, init_declarator(decl, init));
+        } else {
+            vec_push(top_levels, init_declarator(decl, NULL));
+        }
 
-    if (next_token_is('(')) {
-        return function(name, type);
-    }
+        if (consume(';')) {
+            return;
+        }
 
-    return global_var_def(name, type);
+        if (!consume(',')) {
+            error_at(TOKEN(pos)->input, "','でも';'でもないトークンです");
+        }
+
+        decl = declarator(type);
+    }
 }
 
 
@@ -798,7 +1023,7 @@ Node *program() {
     strings = new_vector();
 
     while (TOKEN(pos)->ty != TK_EOF) {
-        vec_push(top_levels, top_level());
+        top_level(top_levels);
     }
 
     Node *node = new_node(ND_PROGRAM, NULL);

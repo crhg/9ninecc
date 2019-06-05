@@ -14,13 +14,24 @@ Type *pointer_of(Type *type) {
 }
 
 // 配列の型
-Type *array_of(Type *type, int size) {
+Type *array_of(Type *type, int size, int incomplete_size) {
     Type *ret = malloc(sizeof(Type));
     ret->ty = ARRAY;
     ret->ptrof = type;
     ret->array_size = size;
+    ret->incomplete_size = incomplete_size;
     return ret;
 }
+
+// 関数の型
+Type *function_of(Type *return_type, Vector *params) {
+    Type *ret = malloc(sizeof(Type));
+    ret->ty = FUNC;
+    ret->return_type = return_type;
+    ret->params = params;
+    return ret;
+}
+
 
 // 型が等しいかどうか調べる
 int type_eq(Type *x, Type *y) {
