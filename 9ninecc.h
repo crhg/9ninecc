@@ -140,6 +140,7 @@ typedef struct Node {
 typedef struct Declarator {
     Type *type;
     Token *id;
+    LocalVar *local_var;
 } Declarator;
 
 typedef enum InitializerType {

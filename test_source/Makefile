@@ -12,7 +12,7 @@ test_main.c: test.c gen_test_main.pl
 	perl gen_test_main.pl test.c |clang-format > test_main.c
 
 test.s: ../9ninecc test.c
-	../9ninecc test.c > test.s
+	../9ninecc test.c > test.s || (mv test.s failed-test.s && exit 1)
 
 test.o: test.s
 	$(CC) -c test.s

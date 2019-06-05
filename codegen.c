@@ -578,11 +578,11 @@ void gen(Node *node) {
         // ...
 
         // 引数の値をローカル変数にコピーする
-        for (int i = 0; i < node->params->len; i++) {
+        for (int i = 0; i < node->type->params->len; i++) {
             print_comment("param %d", i);
 
             // XXX: とりあえずr10は使って良さそうなので使ってみたが...
-            LocalVar *param = ((Node *)node->params->data[i])->local_var;
+            LocalVar *param = ((Declarator *)node->type->params->data[i])->local_var;
             int ty = param->type->ty;
             printf("  mov r10, rbp\n");
             printf("  sub r10, %d\n", param->offset);

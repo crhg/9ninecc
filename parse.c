@@ -730,7 +730,7 @@ Node *param_def() {
 //          identifier-list:
 //                 identifier
 //                 identifier-list , identifier
-Declarator *declarator();
+Declarator *declarator(Type *type);
 
 Declarator *param_decl() {
     Type *type = type_spec();
@@ -766,12 +766,16 @@ Declarator *direct_declarator(Type *type) {
             if (!consume(']')) {
                 error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
             }
-        } else if (consume('(')) {
+
+            continue;
+        }
+
+        if (consume('(')) {
             // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
             // TODO: ...には対応していない
             // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
             Vector *params = new_vector();
-            if (!next_token_is(']')) {
+            if (!next_token_is(')')) {
                 vec_push(params, param_decl());
                 while (consume(',')) {
                     vec_push(params, param_decl());
@@ -783,7 +787,11 @@ Declarator *direct_declarator(Type *type) {
             }
 
             type = function_of(type, params);
+
+            continue;
         }
+
+        break;
     }
 
     decl->type = type;
@@ -798,49 +806,7 @@ Declarator *declarator(Type *type) {
     return direct_declarator(type);
 }
 
-// 関数定義の後半部
-Node *function(Token *function_name, Type *type) {
-    local_var_map = new_map();
-    Node *node = new_node(ND_FUNC, NULL);
-    node->params = new_vector();
-
-    node->token = function_name;
-
-    node->name = function_name->name;
-
-    if (!consume('(')) {
-        error_at(TOKEN(pos)->input, "'('でないトークンです");
-    }
-
-    if (consume(')')) {
-        // 引数無し
-    } else {
-        vec_push(node->params, param_def());
-
-        while (consume(',')) {
-            vec_push(node->params, param_def());
-        }
-
-        if (!consume(')')) {
-            error_at(TOKEN(pos)->input, "')'でないトークンです");
-        }
-    }
-
-    if (!next_token_is('{')) {
-        error_at(TOKEN(pos)->input, "'{'でないトークンです1");
-    }
-
-    node->stmt = block();
-    node->local_var_map = local_var_map;
-
-    allocate_local_var(local_var_map);
-
-    dump_local_var(local_var_map);
-
-    return node;
-}
-
-int get_initalizer_size(Initializer *init, int level) {
+int get_initializer_size(Initializer *init, int level) {
     if (init == NULL) { return -1; }
 
     if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty ==ND_STRING && level == 0) {
@@ -854,7 +820,7 @@ int get_initalizer_size(Initializer *init, int level) {
 
         int ret = 0;
         for (int i = 0; i < init->list->len; i++) {
-            int size = get_initalizer_size(init->list->data[i], level - 1);
+            int size = get_initializer_size(init->list->data[i], level - 1);
             if (size < 0) { return -1; }
             if (size > ret) {
                 ret = size;
@@ -870,7 +836,7 @@ int get_initalizer_size(Initializer *init, int level) {
 void determine_array_size(Type *type, Initializer *init) {
     int level = 0;
     while (type->ty == ARRAY && type->incomplete_size) {
-        int size = get_initalizer_size(init, level);
+        int size = get_initializer_size(init, level);
         if (size < 0) {
             error("配列の要素数が確定しません");
         }
@@ -955,23 +921,28 @@ int is_allowed_as_param(Type *type) {
     }
 }
 
-void register_param_as_local_var(Map *map, Vector *params) {
-    for (int i = 0; i < params->len; params++) {
+void register_param_as_local_var(Vector *params) {
+    for (int i = 0; i < params->len; i++) {
         Declarator *decl = (Declarator *)params->data[i];
 
         if (!is_allowed_as_param(decl->type)) {
             error_at_token(decl->id, "パラメタとして許されない型です: %s", typeToStr(decl->type));
         }
 
-        new_local_var(decl->id->name, decl->type);
+        // ローカル変数として登録してリンクを張る
+        decl->local_var = new_local_var(decl->id->name, decl->type);
     }
 }
 
 Node *function_definition(Declarator *decl) {
     Node *node = new_node(ND_FUNC, decl->id);
+    node->name = decl->id->name;
+    node->type = decl->type;
 
     local_var_map = new_map();
-    register_param_as_local_var(local_var_map, decl->type->params);
+    register_param_as_local_var(decl->type->params);
+    printf("params:\n");
+    dump_local_var(local_var_map);
 
     node->stmt = block();
     node->local_var_map = local_var_map;
@@ -979,7 +950,41 @@ Node *function_definition(Declarator *decl) {
     allocate_local_var(local_var_map);
     dump_local_var(local_var_map);
 
+    printf("# function %s parsed\n", decl->id->name);
+
     return node;
+}
+
+Initializer *initializer() {
+    Initializer *ret;
+
+    ret = malloc(sizeof(Initializer));
+
+    if (consume('{')) {
+        ret->ty = INITIALIZER_TYPE_LIST;
+        Vector *list = new_vector();
+        for (;;) {
+            if (consume('}')) {
+                break;
+            }
+
+            vec_push(list, initializer());
+
+            if (consume('}')) {
+                break;
+            }
+
+            if (!consume(',')) {
+                error_at(TOKEN(pos)->input, "','でも'}'でもないトークンです");
+            }
+        }
+        ret->list = list;
+        return ret;
+    }
+
+    ret->ty = INITIALIZER_TYPE_EXPR;
+    ret->expr = expr();
+    return ret;
 }
 
 

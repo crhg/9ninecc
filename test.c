@@ -15,13 +15,17 @@ void test_vector() {
     Vector *vec = new_vector();
     expect(__LINE__, 0, vec->len);
 
-    for (int i = 0; i < 100; i++)
-        vec_push(vec, (void *)i);
+    for (int i = 0; i < 100; i++) {
+        int *p = malloc(sizeof(int));
+        *p = i;
+        vec_push(vec, p);
+    }
+
 
     expect(__LINE__, 100, vec->len);
-    expect(__LINE__, 0, (long)vec->data[0]);
-    expect(__LINE__, 50, (long)vec->data[50]);
-    expect(__LINE__, 99, (long)vec->data[99]);
+    expect(__LINE__, 0, *(int *)vec->data[0]);
+    expect(__LINE__, 50, *(int *)vec->data[50]);
+    expect(__LINE__, 99, *(int *)vec->data[99]);
 }
 
 void test_map() {
