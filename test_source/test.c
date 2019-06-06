@@ -566,3 +566,10 @@ int test80() { try_printf("hoge"); }
 // @try_out test81 hoge
 int test81() { /* comment */ try_printf("hoge"); }
 // @end
+
+// @try_ret test82 80
+int a82[10][20];
+int test82() {
+    return sizeof(a82[1]);
+}
+// @end

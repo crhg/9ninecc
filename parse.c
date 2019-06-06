@@ -720,11 +720,58 @@ void dump_local_var(Map *map) {
 //                 identifier-list , identifier
 Declarator *declarator(Type *type);
 
+//- <param_decl> ::= <type_spec> <declarator>
 Declarator *param_decl() {
     Type *type = type_spec();
     return declarator(type);
 }
 
+//- <direct_declarator_rest> ::=
+//-     ε
+//-   | '[' <expr>? ']' <direct_declarator_rest>
+//-   | '(' (<param_decl> (,<param_decl>)*)? ')'
+Type *direct_declarator_rest(Type *type) {
+    if (consume('[')) {
+        size_t size;
+        if (next_token_is(']')) {
+            size = 0;
+        } else {
+            Node *e = expr();
+            size = eval_constant_expr(e);
+
+        }
+
+        if (!consume(']')) {
+            error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
+        }
+
+        return array_of(direct_declarator_rest(type), size, 0);
+    }
+
+    if (consume('(')) {
+        // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
+        // TODO: ...には対応していない
+        // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
+        Vector *params = new_vector();
+        if (!next_token_is(')')) {
+            vec_push(params, param_decl());
+            while (consume(',')) {
+                vec_push(params, param_decl());
+            }
+        }
+
+        if (!consume(')')) {
+            error_at(TOKEN(pos)->input, "')'でないトークンです(direct_declarator)");
+        }
+
+        return function_of(direct_declarator_rest(type), params);
+    }
+
+    return type;
+}
+
+//- <direct_declarator> ::- (<ident>|'(' <declarator> ')')<direct_declarator_rest>
+// 左再帰を回避するため変換した。
 Declarator *direct_declarator(Type *type) {
     Token *id;
     Declarator *decl;
@@ -741,51 +788,12 @@ Declarator *direct_declarator(Type *type) {
         error_at(TOKEN(pos)->input, "識別子でも'('でもないトークンです(direct_declarator)");
     }
 
-    for (;;) {
-        if (consume('[')) {
-            if (next_token_is(']')) {
-                type = array_of(type, 0, 1);
-            } else {
-                Node *e = expr();
-                size_t size = eval_constant_expr(e);
-                type = array_of(type, size, 0);
-            }
 
-            if (!consume(']')) {
-                error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
-            }
-
-            continue;
-        }
-
-        if (consume('(')) {
-            // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
-            // TODO: ...には対応していない
-            // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
-            Vector *params = new_vector();
-            if (!next_token_is(')')) {
-                vec_push(params, param_decl());
-                while (consume(',')) {
-                    vec_push(params, param_decl());
-                }
-            }
-
-            if (!consume(')')) {
-                error_at(TOKEN(pos)->input, "')'でないトークンです(direct_declarator)");
-            }
-
-            type = function_of(type, params);
-
-            continue;
-        }
-
-        break;
-    }
-
-    decl->type = type;
+    decl->type = direct_declarator_rest(type);
     return decl;
 }
 
+//- <declarator> ::= '*' <declarator> | <direct_declarator>
 Declarator *declarator(Type *type) {
     if (consume('*')) {
         return declarator(pointer_of(type));
@@ -922,6 +930,7 @@ void register_param_as_local_var(Vector *params) {
     }
 }
 
+//- <function_definition> ::= <block>
 Node *function_definition(Declarator *decl) {
     Node *node = new_node(ND_FUNC, decl->id);
     node->name = decl->id->name;
@@ -943,6 +952,9 @@ Node *function_definition(Declarator *decl) {
     return node;
 }
 
+//- <initializer> ::=
+//-     <expr>
+//-   | '{' (<initializer> (',' <initializer>)* ','? '}'
 Initializer *initializer() {
     Initializer *ret;
 
@@ -976,6 +988,9 @@ Initializer *initializer() {
 }
 
 
+//- <top_level> ::=
+//     <type_spec> <declarator> <function_definition>
+//   | <type_spec> <declarator> ('=' <initializer>)? (',' <declarator> ('=' <initializer>)?)* ';'
 void top_level(Vector *top_levels) {
     Type *type;
     Declarator *decl;
