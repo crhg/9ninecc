@@ -5,7 +5,7 @@ printf("\n");
 printf("void main(int argc, char **argv) {\n");
 
 while (<>) {
-    next unless m%^//%;
+    next unless m%^//\s%;
     chomp;
 
     my($comment, $try, $func, $expected) = split(/\s+/, $_, 4);
