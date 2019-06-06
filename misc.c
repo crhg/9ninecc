@@ -160,8 +160,8 @@ char *strprintf(char *fmt, ...) {
 
     va_list ap;
     va_start(ap, fmt);
-
     int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
 
     char *s = malloc(len+1);
     if (s == NULL) {
