@@ -1,7 +1,6 @@
 CFLAGS=-Wall -std=c11 -g
 SRCS=$(wildcard *.c)
 OBJS=$(SRCS:.c=.o)
-UNAME=$(shell uname)
 
 ifeq ($(shell uname),Linux)
 all: 9ninecc
@@ -23,3 +22,4 @@ endif
 
 clean:
 	rm -f 9ninecc *.o *~ tmp*
+	(cd test_source; make clean)

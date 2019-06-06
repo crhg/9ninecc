@@ -21,4 +21,4 @@ test: tmp
 	./tmp
 
 clean:
-	rm -f *~ tmp* test_main.c test.s
+	rm -f *~ tmp* *.o test_main.c test.s
