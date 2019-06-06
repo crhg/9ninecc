@@ -1,4 +1,4 @@
-SRCS=$(filter-out test.c test_main.c,$(wildcard *.c)) test_main.c
+SRCS=$(filter-out test.c test_main.c dummy_main.c,$(wildcard *.c)) test_main.c
 OBJS=$(SRCS:.c=.o)
 CC=gcc
 CFLAGS=-g
