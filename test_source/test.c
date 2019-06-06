@@ -573,3 +573,16 @@ int test82() {
     return sizeof(a82[1]);
 }
 // @end
+
+// @try_ret test83 42
+int x83 = 42;
+int test83() {
+    return x83;
+}
+
+//// @try_ret test84 2
+//int a84[] = {1,2};
+//int test84() {
+//    return a84[1];
+//}
+//// @end

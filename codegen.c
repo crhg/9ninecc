@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include "9ninecc.h"
 
 // ラベル番号
@@ -216,6 +217,83 @@ int  gen_lval(Node *node) {
     error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
+void gen_global_array_init(Type *type, Initializer *init) {
+    error("not implemented gen_global_array_init");
+}
+
+typedef struct {
+    char *label;
+    long val;
+} GlobalScalarInitValue;
+
+GlobalScalarInitValue *new_global_scalar_init_value(char *label, int val) {
+    GlobalScalarInitValue *ret = malloc(sizeof(GlobalScalarInitValue));
+    ret->label = label;
+    ret->val = val;
+    return ret;
+}
+
+GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
+    if (node->ty == ND_NUM) {
+        return new_global_scalar_init_value(NULL, node->val);
+    }
+
+    if (node->ty == ND_STRING) {
+//        printf("  lea rax, .LC%d[rip] # 文字列: \"%s\"\n", node->str_index, node->token->str);
+        return new_global_scalar_init_value(strprintf(".LC%d"), 0);
+    }
+
+    error_at_node(node, "not implemented eval_global_initializer_scalar");
+}
+
+// グローバル変数の初期化式を評価し、式の文字列の形で返す。
+// 単なる数値もしくはラベル+数値の形の式が使用できる
+char *eval_global_initializer_str(Node *node) {
+    GlobalScalarInitValue *value = eval_global_initializer_scalar(node);
+    if (value->label == NULL) {
+        return strprintf("%ld", value->val);
+    }
+
+    if (value->val == 0) {
+        return value->label;
+    }
+
+    return strprintf("%s%+l", value->label, value->val);
+}
+
+// グローバル定数定義のコード生成
+void gen_global_var_def(Node *node) {
+    char *s;
+    if (node->initializer == NULL) {
+        printf("  .comm %s,%d,%d\n",
+               node->token->name,
+               get_size_of(node->type),
+               get_alignment(node->type)
+        );
+        return;
+    }
+
+    printf("  .data\n");
+    printf("%s:\n", node->token->name);
+    switch (node->type->ty) {
+        case CHAR:
+            printf("  .byte %s\n", eval_global_initializer_str(node->initializer->expr));
+            break;
+        case INT:
+            s=eval_global_initializer_str(node->initializer->expr);
+            printf("  .long %s\n", s);
+            break;
+        case PTR:
+            printf("  .quad %s\n", eval_global_initializer_str(node->initializer->expr));
+            break;
+        case ARRAY:
+            gen_global_array_init(node->type, node->initializer);
+            break;
+        default:
+            error_at_node(node, "型がおかしい(gen_global_var_def");
+    }
+}
+
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_PROGRAM) {
@@ -284,11 +362,7 @@ void gen(Node *node) {
 
     if (node->ty == ND_GLOBAL_VAR_DEF) {
         // グローバル変数定義
-        printf("  .comm %s,%d,%d\n",
-                node->token->name,
-                get_size_of(node->type),
-                get_alignment(node->type)
-              );
+        gen_global_var_def(node);
         return;
     }
 
@@ -563,6 +637,7 @@ void gen(Node *node) {
     if (node->ty == ND_FUNC) {
         print_comment_start("ND_FUNC %s", node->name);
 
+        printf("  .text\n");
         printf(".global %s\n", node->name);
         printf("%s:\n", node->name);
 

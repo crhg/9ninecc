@@ -57,7 +57,7 @@ typedef enum IdType {
 
 // 型
 typedef struct Type {
-    enum { CHAR, INT, PTR, ARRAY, FUNC } ty;
+    enum TypeId { CHAR, INT, PTR, ARRAY, FUNC } ty;
     struct Type *ptrof; // PTRとARRAYのとき
     int array_size; // ARRAYのとき
     char incomplete_size; // 配列のサイズが未確定であることを示すフラグ
