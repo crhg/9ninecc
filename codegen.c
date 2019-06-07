@@ -243,6 +243,40 @@ GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
         return new_global_scalar_init_value(strprintf(".LC%d", node->str_index), 0);
     }
 
+    if (node->ty == ND_GLOBAL_VAR) {
+        if (node->type->ty == ARRAY) {
+            return new_global_scalar_init_value(node->token->name, 0);
+        }
+        error_at_node(node, "初期化に変数の値は使えません");
+    }
+
+    // 以下2項演算子の処理
+    assert_at_node(node, node->lhs != NULL, "lhsがNULL(eval_global_initializer_scalar)");
+    assert_at_node(node, node->rhs != NULL, "rhsがNULL(eval_global_initializer_scalar)");
+    GlobalScalarInitValue *lhs = eval_global_initializer_scalar(node->lhs);
+    GlobalScalarInitValue *rhs = eval_global_initializer_scalar(node->rhs);
+
+    if (node->ty == '+') {
+        if (node->lhs->type->ty == PTR) {
+            lhs->val += rhs->val * get_size_of(node->lhs->type->ptrof);
+            return lhs;
+        }
+        lhs->val += rhs->val;
+        return lhs;
+    }
+
+    if (node->ty == '-') {
+        if (node->type->ty == PTR) {
+            if (node->rhs->type->ty == PTR) {
+                error_at_node(node, "初期化式でポインタ同士の減算はできません");
+            }
+            lhs->val -= rhs->val * get_size_of(node->type);
+            return lhs;
+        }
+        lhs->val -= rhs->val;
+        return lhs;
+    }
+
     error_at_node(node, "not implemented eval_global_initializer_scalar");
 }
 
@@ -258,7 +292,7 @@ char *eval_global_initializer_str(Node *node) {
         return value->label;
     }
 
-    return strprintf("%s%+l", value->label, value->val);
+    return strprintf("%s%+ld", value->label, value->val);
 }
 
 // グローバル定数定義のコード生成

@@ -586,6 +586,20 @@ int test84() {
     try_printf("%s", s84);
 }
 
+// @try_out test85 oo
+char *s85 = "foo" + 1;
+int test85() {
+    try_printf("%s", s85);
+}
+
+// @try_ret test86 86
+int x86[3];
+int *p86 = x86;
+int test86() {
+    x86[1] = 86;
+    return *(p86 + 1);
+}
+
 //// @try_ret test83 42
 //int x84 = 42;
 //int *p84 = &x84;
