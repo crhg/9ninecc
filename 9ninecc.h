@@ -179,7 +179,7 @@ int next_token_is(int ty);
 // エラーを報告するための関数
 // printfと同じ引数を取る
 _Noreturn void error(char *fmt, ...);
-_Noreturn void verror(char *fmt, va_list args);
+void warn(char *fmt, ...);
 
 // エラー箇所を報告するための関数
 _Noreturn void error_at(char *loc, char *fmt, ...);
