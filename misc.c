@@ -21,7 +21,7 @@ void error_at(char *loc, char *fmt, ...) {
 
 void verror_at(char *loc, char *fmt, va_list args) {
     fflush(stdout);
-    
+
     // locが含まれている行の開始地点と終了地点を取得
     char *line = loc;
     while (user_input < line && line[-1] != '\n')

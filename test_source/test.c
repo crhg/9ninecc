@@ -580,6 +580,19 @@ int test83() {
     return x83;
 }
 
+// @try_out test84 foo
+char *s84 = "foo";
+int test84() {
+    try_printf("%s", s84);
+}
+
+//// @try_ret test83 42
+//int x84 = 42;
+//int *p84 = &x84;
+//int test84() {
+//    return *p84;
+//}
+
 //// @try_ret test84 2
 //int a84[] = {1,2};
 //int test84() {

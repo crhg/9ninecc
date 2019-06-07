@@ -240,7 +240,7 @@ GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
 
     if (node->ty == ND_STRING) {
 //        printf("  lea rax, .LC%d[rip] # 文字列: \"%s\"\n", node->str_index, node->token->str);
-        return new_global_scalar_init_value(strprintf(".LC%d"), 0);
+        return new_global_scalar_init_value(strprintf(".LC%d", node->str_index), 0);
     }
 
     error_at_node(node, "not implemented eval_global_initializer_scalar");
