@@ -430,8 +430,113 @@ test_source下のファイルを開くとプロジェクト外のファイルだ
 ちゃんと扱う方法もわからず、とりあえずダミーのmain関数のファイルを作ってそちらを使ってビルドすることにした。(もちろんlinux環境上では
 cmakeは使わずにビルドするので特に問題ない。) やはりcmakeは高度すぎてよくわからない。
 
-#### 配列定義で[]の結合が逆だったので修正(https://github.com/crhg/9ninecc/commit/4e2a6836a282eb285dfa12c628cfd5cb43fe6f3e)
+#### [配列定義で[]の結合が逆だったので修正](https://github.com/crhg/9ninecc/commit/4e2a6836a282eb285dfa12c628cfd5cb43fe6f3e)
 
 2次元配列のテストを追加したらさっそくバグっていたので修正。
 
 左再帰を適当にループ展開したら結合が逆になっていた。ループだと考えにくいので左再帰がなくなるように文法を変換して再帰下降で書き直した。
+
+#### [Linux上でなければmakeをdockerで行う](https://github.com/crhg/9ninecc/commit/9ee9545348dc057304b231a52f32d1736a63ee38)
+
+mac上のCLionで開発するならいちいち確認のために開発サーバにログインするのも面倒になったのでdockerでテストができるようにした。
+
+#### [clang-formatが必要だった](https://github.com/crhg/9ninecc/commit/3c157cf15ee924fc50ca9c26a4923fb280667af9)
+
+clang-formatを使っているのにインストールを忘れていた。
+
+#### [test_sourceのmake clean](https://github.com/crhg/9ninecc/commit/426420586b77fee6d0d0c4819009563c79daf2fc)
+
+test_sourceディレクトリもmake cleanで掃除されるようにした。
+
+#### [strprintfのテスト](https://github.com/crhg/9ninecc/commit/8e89b53932599e05407b1313e1a38529969d72c3)
+
+エンバグして煮詰り、strprintfがあやしいような気がしたので`-test`のテストを久しぶりに追加。
+フォーマット文字列の書き方が悪かっただけでstrprintfは無罪だった...
+バグが見つかったから良しとする。
+
+#### [gen_test_mail.plで@XXを認識するコメントは行頭//+空白で開始するように変更](https://github.com/crhg/9ninecc/commit/e1721b579a87ae6c5d59298002da7556ddc6882c)
+
+テストをコメントアウトしたつもりがコードはコメントアウトされていても`@try_ret`などのコメントに書く指示文字列は拾われてしまうのでおかしなmainが生成される問題。
+コメントアウトを2重にやると`////`と空白が空かないのを利用して行頭の`//`のあとにさらに空白がある場合のみを対象にする。
+
+#### [va_endはあった方がいい?](https://github.com/crhg/9ninecc/commit/2a4c3b8b4c235cddd9f1ac350737dd44ef03d488)
+
+どうなんだろうか??
+
+#### [スカラー変数の数値での初期化](https://github.com/crhg/9ninecc/commit/e2b3136ecffd5a2909902629a5dd383685a43c87)
+
+以下のパターンの初期化ができるようになった。
+
+```C
+int x = 42;
+```
+
+## 2019-06-07
+
+#### [.gitignoreにfailed-test.sを追加](https://github.com/crhg/9ninecc/commit/055a65afb3ee5f7a965980207ed99fac8316dfb3)
+
+#### [verror_atでエラーメッセージを出力する前に標準出力をfflushする](https://github.com/crhg/9ninecc/commit/d8d415777d97966a64be04784bd14b1e4a7b2ece)
+
+9nineccを出力をファイルにリダイレクトしないで動作させたとき、stdoutに出力されるコードがバッファに溜まっていてstderrに出力されるエラーメッセージが先に出ることがありわかりにくいので、エラーメッセージの出力前にstdoutをfflushするようにした。
+
+#### [文字列リテラルによるポインタ型のグローバル変数の初期化](https://github.com/crhg/9ninecc/commit/9b4d22e105e796d308303a283b3bb414e68927a2)
+
+```C
+char *s = "hoge";
+```
+
+#### [配列変数名によるポインタ値での初期化と加減算](https://github.com/crhg/9ninecc/commit/1eb129743d3e79ee12b9433544cf2fc9dd21b5ea)
+
+コミット忘れで2つが混じった。
+
+```C
+int a[10];
+int *p = a;
+```
+
+と
+
+```C
+char *s = "hoge" + 1;
+```
+
+加減算以外の演算子は面倒なので積み残し。
+
+比較演算子とポインタがからむと面倒そうであった。gccで試したところ
+
+```C
+int x;
+int f1 = &x == 0; // 0との比較はOK。定数1になる
+int f2 = &x == 1; // これはエラー
+int f3 = &x > 0; // 0との比較はできる。定数1になる
+int f4 = &x > 1; // これはエラー
+int f5 = &x - 1 > 0; // これはOK。定数1
+```
+
+これらから考えるに
+
+* 変数からとったポインタとそれに加減算したものと定数0は比較できて、ポインタ型は0ではない値とみなされる。
+* ポインタと0以外の数は比較できない
+
+となっているようだが?
+
+#### [グローバル変数初期化式で'&'演算子が使えるようにした](https://github.com/crhg/9ninecc/commit/c08573fb5f0ca4c7ca57df16d2cad03d03682a69)
+
+単項`&`演算子対応。内部で使われるので単項`*`にも対応。
+
+```C
+int x[100];
+int *p = &x[10];
+```
+
+#### [エラー表示関数を整理](https://github.com/crhg/9ninecc/commit/e0d97928baad86dd1a1a72a21c96366e2dba688d)
+
+警告メッセージを出すけどプログラム終了はしない奴が欲しかったので一式追加。
+
+#### [エラー監修整理でwarnの修正漏れ](https://github.com/crhg/9ninecc/commit/ea9955cb50e01bd334ccaf75d28d5fb353080b73)
+
+warnだけ9ninecc.hの中で記述箇所が離れていたので修正漏れ。
+
+#### [グローバル変数の初期化リストによる初期化](https://github.com/crhg/9ninecc/commit/1a0e19eed5f432a5805094681cd9a7c28cd25526)
+
+配列の初期化に対応。
