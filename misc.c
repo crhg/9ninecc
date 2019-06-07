@@ -12,14 +12,35 @@ int is_alnum(char c) {
            (c == '_');
 }
 
-// エラー箇所を報告するための関数
-void error_at(char *loc, char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    verror_at(loc, fmt, ap);
+// エラー・警告表示関数群
+
+// エラーを報告するための関数
+// printfと同じ引数を取る
+
+void vwarn(char *fmt, va_list args) {
+    vfprintf(stderr, fmt, args);
+    fprintf(stderr, "\n");
+
 }
 
-void verror_at(char *loc, char *fmt, va_list args) {
+void error(char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn(fmt, ap);
+    va_end(ap);
+    exit(1);
+}
+
+void warn(char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn(fmt, ap);
+    va_end(ap);
+}
+
+void vwarn_at(char *loc, char *fmt, va_list args) {
+    fflush(stdout);
+
     // locが含まれている行の開始地点と終了地点を取得
     char *line = loc;
     while (user_input < line && line[-1] != '\n')
@@ -44,23 +65,45 @@ void verror_at(char *loc, char *fmt, va_list args) {
     fprintf(stderr, "^ ");
     vfprintf(stderr, fmt, args);
     fprintf(stderr, "\n");
+}
 
+// エラー箇所を報告するための関数
+void error_at(char *loc, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at(loc, fmt, ap);
+    va_end(ap);
     exit(1);
 }
 
-void error_at_token(Token *token, char *fmt, ...) {
-
+void warn_at(char *loc, char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    verror_at_token(token, fmt, ap);
+    vwarn_at(loc, fmt, ap);
+    va_end(ap);
 }
 
-void verror_at_token(Token *token, char *fmt, va_list args) {
+void vwarn_at_token(Token *token, char *fmt, va_list args) {
     if (token) {
-        verror_at(token->input, fmt, args);
+        vwarn_at(token->input, fmt, args);
     } else {
-        verror(fmt, args);
+        vwarn(fmt, args);
     }
+}
+
+void error_at_token(Token *token, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at_token(token, fmt, ap);
+    va_end(ap);
+    exit(1);
+}
+
+void warn_at_token(Token *token, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at_token(token, fmt, ap);
+    va_end(ap);
 }
 
 void assert_at_node(Node *node, int cond, char *fmt, ...) {
@@ -68,13 +111,24 @@ void assert_at_node(Node *node, int cond, char *fmt, ...) {
 
     va_list ap;
     va_start(ap, fmt);
-    verror_at_token(node->token, fmt, ap);
+    vwarn_at_token(node->token, fmt, ap);
+    va_end(ap);
+    exit(1);
 }
 
 void error_at_node(Node *node, char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    verror_at_token(node->token, fmt, ap);
+    vwarn_at_token(node->token, fmt, ap);
+    va_end(ap);
+    exit(1);
+}
+
+void warn_at_node(Node *node, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at_token(node->token, fmt, ap);
+    va_end(ap);
 }
 
 void print_loc(char *loc) {
@@ -160,8 +214,8 @@ char *strprintf(char *fmt, ...) {
 
     va_list ap;
     va_start(ap, fmt);
-
     int len = vsnprintf(buf, sizeof(buf), fmt, ap);
+    va_end(ap);
 
     char *s = malloc(len+1);
     if (s == NULL) {

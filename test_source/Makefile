@@ -1,4 +1,4 @@
-SRCS=$(filter-out test.c test_main.c,$(wildcard *.c)) test_main.c
+SRCS=$(filter-out test.c test_main.c dummy_main.c,$(wildcard *.c)) test_main.c
 OBJS=$(SRCS:.c=.o)
 CC=gcc
 CFLAGS=-g
@@ -12,7 +12,7 @@ test_main.c: test.c gen_test_main.pl
 	perl gen_test_main.pl test.c |clang-format > test_main.c
 
 test.s: ../9ninecc test.c
-	../9ninecc test.c > test.s
+	../9ninecc test.c > test.s || (mv test.s failed-test.s && exit 1)
 
 test.o: test.s
 	$(CC) -c test.s
@@ -21,4 +21,4 @@ test: tmp
 	./tmp
 
 clean:
-	rm -f *~ tmp* test_main.c test.s
+	rm -f *~ tmp* *.o test_main.c test.s

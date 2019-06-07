@@ -1,5 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "9ninecc.h"
 
 // ラベル番号
@@ -216,6 +218,192 @@ int  gen_lval(Node *node) {
     error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
+void gen_global_var_init_data(Type *type, Initializer *init);
+
+void gen_global_array_init(Type *type, Initializer *init) {
+    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty == ND_STRING) {
+        if (type->ptrof->ty != CHAR) {
+            error_at_node(init->expr, "文字列リテラルでchar型以外の配列を初期化することはできません");
+        }
+
+        char *s = init->expr->token->str;
+
+        if (type->array_size == 0) {
+            type->array_size = strlen(s) + 1;
+        }
+
+        // 文字列リテラルが配列に収まりきらない場合
+        if (type->array_size < strlen(s) + 1) {
+            printf("  .ascii \"%*s\"\n", type->array_size, s);
+            if (type->array_size < strlen(s)) {
+                warn_at_node(init->expr, "配列のサイズより長い文字列リテラルです");
+            }
+            return;
+        }
+
+        printf("  .string \"%s\"\n", s);
+        
+        if (type->array_size > strlen(s) + 1) {
+            printf("  .zero %ld\n", type->array_size - (strlen(s) + 1));
+        }
+        
+        return;
+    }
+    
+    if (init->ty != INITIALIZER_TYPE_LIST) {
+        error_at_node(init->expr, "配列を数値で初期化することはできません");
+    }
+
+    if (type->array_size == 0) {
+        if (init->list->len == 0) {
+            error("配列のサイズ指定がなくて初期化リストが空");
+        }
+        type->array_size = init->list->len;
+    }
+
+    for (int i = 0; i < type->array_size; i++) {
+        if (i >= init->list->len) {
+            // 初期化リストの項目数が足りないので残りを0で埋めて終わり
+            printf("  .zero %d\n", ((i+1) - init->list->len ) * get_size_of(type->ptrof));
+            return;
+        }
+
+        gen_global_var_init_data(type->ptrof, init->list->data[i]);
+    }
+
+    if (type->array_size < init->list->len) {
+        warn("初期化リストの項目数が配列のサイズより多い");
+    }
+}
+
+typedef struct {
+    char *label;
+    long val;
+} GlobalScalarInitValue;
+
+GlobalScalarInitValue *new_global_scalar_init_value(char *label, int val) {
+    GlobalScalarInitValue *ret = malloc(sizeof(GlobalScalarInitValue));
+    ret->label = label;
+    ret->val = val;
+    return ret;
+}
+
+GlobalScalarInitValue *eval_global_initializer_scalar(Node *node);
+
+GlobalScalarInitValue *eval_global_initializer_lval(Node *node) {
+    if (node->ty == ND_GLOBAL_VAR) {
+        return new_global_scalar_init_value(node->token->name, 0);
+    }
+
+    if (node->ty == ND_DEREF) {
+        return eval_global_initializer_scalar(node->ptrto);
+    }
+
+    error_at_node(node, "lvalではありません");
+}
+
+GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
+    if (node->ty == ND_NUM) {
+        return new_global_scalar_init_value(NULL, node->val);
+    }
+
+    if (node->ty == ND_STRING) {
+//        printf("  lea rax, .LC%d[rip] # 文字列: \"%s\"\n", node->str_index, node->token->str);
+        return new_global_scalar_init_value(strprintf(".LC%d", node->str_index), 0);
+    }
+
+    if (node->ty == ND_GLOBAL_VAR) {
+        if (node->variable_type->ty == ARRAY) {
+            return new_global_scalar_init_value(node->token->name, 0);
+        }
+        error_at_node(node, "初期化に変数の値は使えません");
+    }
+
+    if (node->ty == ND_GET_PTR) {
+        return eval_global_initializer_lval(node->ptrof);
+    }
+
+    // 以下2項演算子の処理
+    assert_at_node(node, node->lhs != NULL, "lhsがNULL(eval_global_initializer_scalar)");
+    assert_at_node(node, node->rhs != NULL, "rhsがNULL(eval_global_initializer_scalar)");
+    GlobalScalarInitValue *lhs = eval_global_initializer_scalar(node->lhs);
+    GlobalScalarInitValue *rhs = eval_global_initializer_scalar(node->rhs);
+
+    if (node->ty == '+') {
+        if (node->lhs->type->ty == PTR) {
+            lhs->val += rhs->val * get_size_of(node->lhs->type->ptrof);
+            return lhs;
+        }
+        lhs->val += rhs->val;
+        return lhs;
+    }
+
+    if (node->ty == '-') {
+        if (node->type->ty == PTR) {
+            if (node->rhs->type->ty == PTR) {
+                error_at_node(node, "初期化式でポインタ同士の減算はできません");
+            }
+            lhs->val -= rhs->val * get_size_of(node->type);
+            return lhs;
+        }
+        lhs->val -= rhs->val;
+        return lhs;
+    }
+
+    error_at_node(node, "not implemented eval_global_initializer_scalar");
+}
+
+// グローバル変数の初期化式を評価し、式の文字列の形で返す。
+// 単なる数値もしくはラベル+数値の形の式が使用できる
+char *eval_global_initializer_str(Node *node) {
+    GlobalScalarInitValue *value = eval_global_initializer_scalar(node);
+    if (value->label == NULL) {
+        return strprintf("%ld", value->val);
+    }
+
+    if (value->val == 0) {
+        return value->label;
+    }
+
+    return strprintf("%s%+ld", value->label, value->val);
+}
+
+void gen_global_var_init_data(Type *type, Initializer *init) {
+    switch (type->ty) {
+
+        case CHAR:
+            printf("  .byte %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case INT:
+            printf("  .long %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case PTR:
+            printf("  .quad %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case ARRAY:
+            gen_global_array_init(type, init);
+            break;
+        default:
+            error("型がおかしい(gen_global_var_def");
+    }
+}
+
+// グローバル定数定義のコード生成
+void gen_global_var_def(Node *node) {
+    if (node->initializer == NULL) {
+        printf("  .comm %s,%d,%d\n",
+               node->token->name,
+               get_size_of(node->type),
+               get_alignment(node->type)
+        );
+        return;
+    }
+
+    printf("  .data\n");
+    printf("%s:\n", node->token->name);
+    gen_global_var_init_data(node->type, node->initializer);
+}
+
 // コード生成
 void gen(Node *node) {
     if (node->ty == ND_PROGRAM) {
@@ -284,11 +472,7 @@ void gen(Node *node) {
 
     if (node->ty == ND_GLOBAL_VAR_DEF) {
         // グローバル変数定義
-        printf("  .comm %s,%d,%d\n",
-                node->token->name,
-                get_size_of(node->type),
-                get_alignment(node->type)
-              );
+        gen_global_var_def(node);
         return;
     }
 
@@ -563,6 +747,7 @@ void gen(Node *node) {
     if (node->ty == ND_FUNC) {
         print_comment_start("ND_FUNC %s", node->name);
 
+        printf("  .text\n");
         printf(".global %s\n", node->name);
         printf("%s:\n", node->name);
 
@@ -578,11 +763,11 @@ void gen(Node *node) {
         // ...
 
         // 引数の値をローカル変数にコピーする
-        for (int i = 0; i < node->params->len; i++) {
+        for (int i = 0; i < node->type->params->len; i++) {
             print_comment("param %d", i);
 
             // XXX: とりあえずr10は使って良さそうなので使ってみたが...
-            LocalVar *param = ((Node *)node->params->data[i])->local_var;
+            LocalVar *param = ((Declarator *)node->type->params->data[i])->local_var;
             int ty = param->type->ty;
             printf("  mov r10, rbp\n");
             printf("  sub r10, %d\n", param->offset);

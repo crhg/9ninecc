@@ -1,0 +1,7 @@
+version: '3'
+
+services:
+    9ninecc-env:
+        build: ./docker
+        volumes:
+            - .:/work

@@ -57,14 +57,19 @@ typedef enum IdType {
 
 // 型
 typedef struct Type {
-    enum { CHAR, INT, PTR, ARRAY } ty;
-    struct Type *ptrof;
-    int array_size;
+    enum TypeId { CHAR, INT, PTR, ARRAY, FUNC } ty;
+    struct Type *ptrof; // PTRとARRAYのとき
+    int array_size; // ARRAYのとき
+    char incomplete_size; // 配列のサイズが未確定であることを示すフラグ
+    struct Type *return_type; // FUNCのとき戻り値の型を示す
+    Vector *params; // FUNCのときパラメタのベクター。要素はDeclarator
 } Type;
+
 extern Type int_type;
 extern Type char_type;
 Type *pointer_of(Type *type);
-Type *array_of(Type *type, int size);
+Type *array_of(Type *type, int size, int incomplete_size);
+Type *function_of(Type *type, Vector *params);
 int type_eq(Type *x, Type *y);
 int get_size_of(Type *type);
 int get_alignment(Type *type);
@@ -102,6 +107,9 @@ typedef enum NodeType {
     ND_STRING,    // 文字列リテラル
 } NodeType;
 
+
+struct Initializer;
+
 // ノードの型
 typedef struct Node {
     int ty;
@@ -126,7 +134,25 @@ typedef struct Node {
     Vector *top_levels; // ND_PROGRAMのときのトップレベルのベクタ
     Vector *strings;    // ND_PROGRAMのときのストリングリテラルのベクタ
     int str_index;      // ND_STRINGのときの文字列リテラルの通し番号
+    struct Initializer *initializer; // 変数定義のときの初期化子
 } Node;
+
+typedef struct Declarator {
+    Type *type;
+    Token *id;
+    LocalVar *local_var;
+} Declarator;
+
+typedef enum InitializerType {
+    INITIALIZER_TYPE_EXPR,
+    INITIALIZER_TYPE_LIST,
+} InitializerType;
+
+typedef struct Initializer {
+    InitializerType ty;
+    Node *expr;
+    Vector *list;
+} Initializer;
 
 // 入力プログラムのファイル名
 extern char *filename;
@@ -153,14 +179,15 @@ int next_token_is(int ty);
 // エラーを報告するための関数
 // printfと同じ引数を取る
 _Noreturn void error(char *fmt, ...);
-_Noreturn void verror(char *fmt, va_list args);
+void warn(char *fmt, ...);
 
 // エラー箇所を報告するための関数
 _Noreturn void error_at(char *loc, char *fmt, ...);
-_Noreturn void verror_at(char *loc, char *fmt, va_list args);
+void warn_at(char *loc, char *fmt, ...);
 _Noreturn void error_at_token(Token *token, char *fmt, ...);
-_Noreturn void verror_at_token(Token *token, char *fmt, va_list args);
+void warn_at_token(Token *token, char *fmt, ...);
 _Noreturn void error_at_node(Node *node, char *fmt, ...);
+void warn_at_node(Node *node, char *fmt, ...);
 void assert_at_node(Node *node, int cond, char *fmt, ...);
 
 void print_loc(char *loc);
@@ -188,7 +215,6 @@ extern Map *local_var_map;
 #define LOCAL_VAR_NUM (map->keys->len)
 int get_local_var_offset(char *name);
 int new_local_var_offset(char *name);
-int get_size_of(Type *type);
 
 // コード生成
 void gen(Node *node);

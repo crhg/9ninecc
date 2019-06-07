@@ -566,3 +566,51 @@ int test80() { try_printf("hoge"); }
 // @try_out test81 hoge
 int test81() { /* comment */ try_printf("hoge"); }
 // @end
+
+// @try_ret test82 80
+int a82[10][20];
+int test82() {
+    return sizeof(a82[1]);
+}
+// @end
+
+// @try_ret test83 42
+int x83 = 42;
+int test83() {
+    return x83;
+}
+
+// @try_out test84 foo
+char *s84 = "foo";
+int test84() {
+    try_printf("%s", s84);
+}
+
+// @try_out test85 oo
+char *s85 = "foo" + 1;
+int test85() {
+    try_printf("%s", s85);
+}
+
+// @try_ret test86 86
+int x86[3];
+int *p86 = x86;
+int test86() {
+    x86[1] = 86;
+    return *(p86 + 1);
+}
+
+// @try_ret test87 87
+int x87[3];
+int *p87 = &x87[1];
+int test87() {
+    x87[1] = 87;
+    return *p87;
+}
+
+// @try_ret test88 2
+int a88[] = {1,2};
+int test88() {
+    return a88[1];
+}
+// @end
