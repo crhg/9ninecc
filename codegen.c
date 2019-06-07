@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "9ninecc.h"
 
 // ラベル番号
@@ -217,8 +218,62 @@ int  gen_lval(Node *node) {
     error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
+void gen_global_var_init_data(Type *type, Initializer *init);
+
 void gen_global_array_init(Type *type, Initializer *init) {
-    error("not implemented gen_global_array_init");
+    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty == ND_STRING) {
+        if (type->ptrof->ty != CHAR) {
+            error_at_node(init->expr, "文字列リテラルでchar型以外の配列を初期化することはできません");
+        }
+
+        char *s = init->expr->token->str;
+
+        if (type->array_size == 0) {
+            type->array_size = strlen(s) + 1;
+        }
+
+        // 文字列リテラルが配列に収まりきらない場合
+        if (type->array_size < strlen(s) + 1) {
+            printf("  .ascii \"%*s\"\n", type->array_size, s);
+            if (type->array_size < strlen(s)) {
+                warn_at_node(init->expr, "配列のサイズより長い文字列リテラルです");
+            }
+            return;
+        }
+
+        printf("  .string \"%s\"\n", s);
+        
+        if (type->array_size > strlen(s) + 1) {
+            printf("  .zero %ld\n", type->array_size - (strlen(s) + 1));
+        }
+        
+        return;
+    }
+    
+    if (init->ty != INITIALIZER_TYPE_LIST) {
+        error_at_node(init->expr, "配列を数値で初期化することはできません");
+    }
+
+    if (type->array_size == 0) {
+        if (init->list->len == 0) {
+            error("配列のサイズ指定がなくて初期化リストが空");
+        }
+        type->array_size = init->list->len;
+    }
+
+    for (int i = 0; i < type->array_size; i++) {
+        if (i >= init->list->len) {
+            // 初期化リストの項目数が足りないので残りを0で埋めて終わり
+            printf("  .zero %d\n", ((i+1) - init->list->len ) * get_size_of(type->ptrof));
+            return;
+        }
+
+        gen_global_var_init_data(type->ptrof, init->list->data[i]);
+    }
+
+    if (type->array_size < init->list->len) {
+        warn("初期化リストの項目数が配列のサイズより多い");
+    }
 }
 
 typedef struct {
@@ -313,9 +368,28 @@ char *eval_global_initializer_str(Node *node) {
     return strprintf("%s%+ld", value->label, value->val);
 }
 
+void gen_global_var_init_data(Type *type, Initializer *init) {
+    switch (type->ty) {
+
+        case CHAR:
+            printf("  .byte %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case INT:
+            printf("  .long %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case PTR:
+            printf("  .quad %s\n", eval_global_initializer_str(init->expr));
+            break;
+        case ARRAY:
+            gen_global_array_init(type, init);
+            break;
+        default:
+            error("型がおかしい(gen_global_var_def");
+    }
+}
+
 // グローバル定数定義のコード生成
 void gen_global_var_def(Node *node) {
-    char *s;
     if (node->initializer == NULL) {
         printf("  .comm %s,%d,%d\n",
                node->token->name,
@@ -327,23 +401,7 @@ void gen_global_var_def(Node *node) {
 
     printf("  .data\n");
     printf("%s:\n", node->token->name);
-    switch (node->type->ty) {
-        case CHAR:
-            printf("  .byte %s\n", eval_global_initializer_str(node->initializer->expr));
-            break;
-        case INT:
-            s=eval_global_initializer_str(node->initializer->expr);
-            printf("  .long %s\n", s);
-            break;
-        case PTR:
-            printf("  .quad %s\n", eval_global_initializer_str(node->initializer->expr));
-            break;
-        case ARRAY:
-            gen_global_array_init(node->type, node->initializer);
-            break;
-        default:
-            error_at_node(node, "型がおかしい(gen_global_var_def");
-    }
+    gen_global_var_init_data(node->type, node->initializer);
 }
 
 // コード生成

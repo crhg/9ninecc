@@ -608,16 +608,9 @@ int test87() {
     return *p87;
 }
 
-//// @try_ret test83 42
-//int x84 = 42;
-//int *p84 = &x84;
-//int test84() {
-//    return *p84;
-//}
-
-//// @try_ret test84 2
-//int a84[] = {1,2};
-//int test84() {
-//    return a84[1];
-//}
-//// @end
+// @try_ret test88 2
+int a88[] = {1,2};
+int test88() {
+    return a88[1];
+}
+// @end
