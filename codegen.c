@@ -233,6 +233,20 @@ GlobalScalarInitValue *new_global_scalar_init_value(char *label, int val) {
     return ret;
 }
 
+GlobalScalarInitValue *eval_global_initializer_scalar(Node *node);
+
+GlobalScalarInitValue *eval_global_initializer_lval(Node *node) {
+    if (node->ty == ND_GLOBAL_VAR) {
+        return new_global_scalar_init_value(node->token->name, 0);
+    }
+
+    if (node->ty == ND_DEREF) {
+        return eval_global_initializer_scalar(node->ptrto);
+    }
+
+    error_at_node(node, "lvalではありません");
+}
+
 GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
     if (node->ty == ND_NUM) {
         return new_global_scalar_init_value(NULL, node->val);
@@ -244,10 +258,14 @@ GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
     }
 
     if (node->ty == ND_GLOBAL_VAR) {
-        if (node->type->ty == ARRAY) {
+        if (node->variable_type->ty == ARRAY) {
             return new_global_scalar_init_value(node->token->name, 0);
         }
         error_at_node(node, "初期化に変数の値は使えません");
+    }
+
+    if (node->ty == ND_GET_PTR) {
+        return eval_global_initializer_lval(node->ptrof);
     }
 
     // 以下2項演算子の処理

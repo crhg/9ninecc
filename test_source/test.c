@@ -600,6 +600,14 @@ int test86() {
     return *(p86 + 1);
 }
 
+// @try_ret test87 87
+int x87[3];
+int *p87 = &x87[1];
+int test87() {
+    x87[1] = 87;
+    return *p87;
+}
+
 //// @try_ret test83 42
 //int x84 = 42;
 //int *p84 = &x84;
