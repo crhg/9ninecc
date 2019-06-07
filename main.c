@@ -8,19 +8,6 @@
 // 入力ファイル名
 char *filename;
 
-// エラーを報告するための関数
-// printfと同じ引数を取る
-void error(char *fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    verror(fmt, ap);
-}
-
-void verror(char *fmt, va_list args) {
-    vfprintf(stderr, fmt, args);
-    fprintf(stderr, "\n");
-    exit(1);
-}
 
 int main(int argc, char **argv) {
     if (argc != 2) {

@@ -183,10 +183,11 @@ _Noreturn void verror(char *fmt, va_list args);
 
 // エラー箇所を報告するための関数
 _Noreturn void error_at(char *loc, char *fmt, ...);
-_Noreturn void verror_at(char *loc, char *fmt, va_list args);
+void warn_at(char *loc, char *fmt, ...);
 _Noreturn void error_at_token(Token *token, char *fmt, ...);
-_Noreturn void verror_at_token(Token *token, char *fmt, va_list args);
+void warn_at_token(Token *token, char *fmt, ...);
 _Noreturn void error_at_node(Node *node, char *fmt, ...);
+void warn_at_node(Node *node, char *fmt, ...);
 void assert_at_node(Node *node, int cond, char *fmt, ...);
 
 void print_loc(char *loc);
