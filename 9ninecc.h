@@ -135,6 +135,8 @@ typedef struct Node {
     Vector *strings;    // ND_PROGRAMのときのストリングリテラルのベクタ
     int str_index;      // ND_STRINGのときの文字列リテラルの通し番号
     struct Initializer *initializer; // 変数定義のときの初期化子
+    Vector *decllarators; // ND_LOCAL_VAR_DEFのときのDeclaratorのベクタ
+    Vector *local_vars;   // ND_LOCAL_VAR_DEFのときのLocalVarのベクタ
 } Node;
 
 typedef struct Declarator {

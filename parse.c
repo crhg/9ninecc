@@ -511,15 +511,28 @@ Type *type_spec() {
     return NULL;
 }
 
-//- <local_var_def> ::= <type_spec> <ptr_ident>
-Node *local_var_def() {
-    Type *type = type_spec();
+Declarator *declarator(Type *type);
+void declaration_rest(Type *type, Declarator *decl, Vector *vec);
 
-    Node *node_ptr_ident = ptr_ident(type);
+//- <local_var_def> ::=
+//-     <type_spec> <declarator> <declaration_rest>
+// <type_spec>は既に読まれた状態で呼ばれる。結果のtypeはパラメタでもらう
+Node *local_var_def(Type *type) {
+    Declarator *decl = declarator(type);
+    Vector *vec = new_vector();
 
-    Node *node = new_node(ND_LOCAL_VAR_DEF, node_ptr_ident->token);
-    node->lhs = node_ptr_ident; // 一応リンクしておくが今のところ使用しない
-    node->local_var = find_local_var(node_ptr_ident);
+    declaration_rest(type, decl, vec);
+
+    Vector *local_vars = new_vector();
+    for (int i = 0; i < vec->len; i++) {
+        Declarator *d = ((DeclInit *) vec->data[i])->decl;
+        vec_push(local_vars, new_local_var(d->id->name, d->type));
+    }
+
+    Node *node = new_node(ND_LOCAL_VAR_DEF, decl->id); // XXX: とりらえず最初の識別子トークンで代表
+    node->decllarators = vec;
+    node->local_vars = local_vars;
+
     return node;
 }
 
@@ -533,6 +546,7 @@ Node *local_var_def() {
 //-    | <expr> ';'
 Node *stmt() {
     Node *node;
+    Type *type;
 
     if (consume(TK_IF)) {
         node = new_node(ND_IF, NULL);
@@ -607,11 +621,9 @@ Node *stmt() {
         return node;
     }
 
-    if (next_token_is(TK_INT) || next_token_is(TK_CHAR)) {
-        node = local_var_def();
-        if (!consume(';')) {
-            error_at(TOKEN(pos)->input, "';'ではないトークンです");
-        }
+    type = type_spec();
+    if (type != NULL) {
+        node = local_var_def(type);
         return node;
     }
 
