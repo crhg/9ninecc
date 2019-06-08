@@ -122,14 +122,14 @@ char *reg_table[][4] = {
     {"rbp", "ebp", "bp", "bpl"},
     {"rsp", "esp", "sp", "spl"},
     {"rbx", "ebx", "bx", "bl"},
-    {"r8", "r8d", "r8w", "r8b"}, 
-    {"r9", "r9d", "r9w", "r9b"}, 
-    {"r10", "r10d", "r10w", "r10b"}, 
-    {"r11", "r11d", "r11w", "r11b"}, 
-    {"r12", "r12d", "r12w", "r12b"}, 
-    {"r13", "r13d", "r13w", "r13b"}, 
-    {"r14", "r14d", "r14w", "r14b"}, 
-    {"r15", "r15d", "r15w", "r15b"}, 
+    {"r8", "r8d", "r8w", "r8b"},
+    {"r9", "r9d", "r9w", "r9b"},
+    {"r10", "r10d", "r10w", "r10b"},
+    {"r11", "r11d", "r11w", "r11b"},
+    {"r12", "r12d", "r12w", "r12b"},
+    {"r13", "r13d", "r13w", "r13b"},
+    {"r14", "r14d", "r14w", "r14b"},
+    {"r15", "r15d", "r15w", "r15b"},
 };
 
 // レジスタ名の選択
@@ -218,15 +218,8 @@ int  gen_lval(Node *node) {
     error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
-void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
-    error("初期値リストによる初期化は未実装です");
-}
 
-void gen_local_var_scalar_init(Type *type, int offset, Initializer *init) {
-    if (init->ty != INITIALIZER_TYPE_EXPR) {
-        error("スカラー変数の初期化は式でなければなりません");
-    }
-
+void gen_local_var_scalar_init(Type *type, int offset, Node *expr) {
     print_comment("ローカル変数初期化: lhs計算");
     printf("  mov rax, rbp\n");
     printf("  sub rax, %d\n", offset);
@@ -234,7 +227,7 @@ void gen_local_var_scalar_init(Type *type, int offset, Initializer *init) {
     stack_push(8);
 
     print_comment("ローカル変数初期化: rhs計算");
-    gen(init->expr);
+    gen(expr);
 
     print_comment("ローカル変数初期化: ストア処理 ty=%s", tyToStr(type->ty));
     printf("  pop rdi\n");
@@ -256,6 +249,65 @@ void gen_local_var_scalar_init(Type *type, int offset, Initializer *init) {
     }
 }
 
+void gen_local_var_init(Type *type, int offset, Initializer *init);
+
+// ローカル変数領域のoffsetからsizeバイトを0で埋めるコードを生成する
+void gen_local_var_zero(int offset, int size) {
+    print_comment("gen_local_var_zero offset=%d size=%d", offset, size);
+    int adjusted = adjust_stack(0);
+    printf("  mov rdi, rbp\n");
+    printf("  sub rdi, %d\n", offset);
+    printf("  mov rsi, %d\n", size);
+    printf("  mov al, 0\n");
+    printf("  call bzero@PLT\n");
+    restore_stack(adjusted, 0);
+}
+
+void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
+    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty == ND_STRING) {
+        char *s = init->expr->token->str;
+        int size_of_s = strlen(s) + 1;
+
+        // 文字列リテラルが配列に収まりきらない場合
+        if (type->array_size < size_of_s - 1) {
+            warn_at_node(init->expr, "配列のサイズより長い文字列リテラルです");
+        }
+
+        for (int i = 0; i < type->array_size; i++) {
+            int c = (i < size_of_s)? s[i]: 0;
+            print_comment("ローカル変数初期化: offset=%d", i);
+            printf("  mov rax, rbp\n");
+            printf("  sub rax, %d\n", offset - i);
+            printf("  mov [rax], BYTE PTR %d\n", c);
+        }
+
+        return;
+    }
+
+    Type *element_type = type->ptrof;
+    int element_size = get_size_of(element_type);
+    int size = init->list->len < type->array_size? init->list->len: type->array_size;
+    for (int i = 0; i < size; i++) {
+        print_comment("ローカル変数初期化: offset=%d", i);
+        gen_local_var_init(element_type, offset - element_size * i, init->list->data[i]);
+    }
+
+    if (type->array_size > init->list->len) {
+        gen_local_var_zero(
+                offset - element_size * init->list->len,
+                element_size * (type->array_size - init->list->len)
+                );
+    }
+}
+
+void gen_local_var_init(Type *type, int offset, Initializer *init) {
+    if (type->ty == ARRAY) {
+        gen_local_var_array_init(type, offset, init);
+    } else {
+        gen_local_var_scalar_init(type, offset, init->expr);
+    }
+}
+
 void gen_local_var_def(Node *node) {
     for (int i = 0; i < node->local_vars->len; i++) {
         DeclInit *decl_init = node->decl_inits->data[i];
@@ -270,11 +322,7 @@ void gen_local_var_def(Node *node) {
         }
 
         LocalVar *var = node->local_vars->data[i];
-        if (var->type->ty == ARRAY) {
-            gen_local_var_array_init(var->type, var->offset, init);
-        } else {
-            gen_local_var_scalar_init(var->type, var->offset, init);
-        }
+        gen_local_var_init(var->type, var->offset, init);
 
         print_comment_end("gen_local_var_def name=%s", decl->id->name);
     }
@@ -304,14 +352,14 @@ void gen_global_array_init(Type *type, Initializer *init) {
         }
 
         printf("  .string \"%s\"\n", s);
-        
+
         if (type->array_size > strlen(s) + 1) {
             printf("  .zero %ld\n", type->array_size - (strlen(s) + 1));
         }
-        
+
         return;
     }
-    
+
     if (init->ty != INITIALIZER_TYPE_LIST) {
         error_at_node(init->expr, "配列を数値で初期化することはできません");
     }
@@ -700,7 +748,7 @@ void gen(Node *node) {
 
     if (node->ty == ND_IF) {
         print_comment_start("ND_IF");
-        
+
         stack_ptr = 0;
         gen(node->cond);
         int seq = label_seq++;
@@ -898,7 +946,7 @@ void gen(Node *node) {
         printf("  push rax\n");
         stack_push(8);
         print_comment_end("+");
-        
+
         return;
     }
 

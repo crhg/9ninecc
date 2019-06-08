@@ -629,3 +629,16 @@ int test90() {
 }
 // @end
 
+// @try_out test91 test91
+int test91() {
+    char s[7] = "test91";
+    try_printf("%s", s);
+}
+// @end
+
+// @try_ret test92 92
+int test92() {
+    int x[3] = {91, 92};
+    return x[1];
+}
+// @end
