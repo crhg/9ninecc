@@ -154,6 +154,11 @@ typedef struct Initializer {
     Vector *list;
 } Initializer;
 
+typedef struct DeclInit {
+    Declarator *decl;
+    Initializer *init;
+} DeclInit;
+
 // 入力プログラムのファイル名
 extern char *filename;
 

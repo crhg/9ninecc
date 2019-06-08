@@ -993,11 +993,6 @@ Initializer *initializer() {
 }
 
 
-typedef struct DeclInit {
-    Declarator *decl;
-    Initializer *init;
-} DeclInit;
-
 DeclInit *decl_init(Declarator *decl, Initializer *init) {
     DeclInit *ret = malloc(sizeof(DeclInit));
     ret->decl = decl;
