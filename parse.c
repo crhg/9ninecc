@@ -498,6 +498,7 @@ LocalVar *find_local_var(Node *node) {
 }
 
 //- <type_spec> ::= int | char
+// 見つからなければnullを返す
 Type *type_spec() {
     if (consume(TK_INT)) {
         return &int_type;
@@ -507,7 +508,7 @@ Type *type_spec() {
         return &char_type;
     }
 
-    error_at(TOKEN(pos)->input, "intまたはcharでないトークンです");
+    return NULL;
 }
 
 //- <local_var_def> ::= <type_spec> <ptr_ident>
@@ -723,6 +724,10 @@ Declarator *declarator(Type *type);
 //- <param_decl> ::= <type_spec> <declarator>
 Declarator *param_decl() {
     Type *type = type_spec();
+    if (type == NULL) {
+        error_at(TOKEN(pos)->input, "intまたはcharでないトークンです(param_decl)");
+    }
+
     return declarator(type);
 }
 
@@ -996,6 +1001,10 @@ void top_level(Vector *top_levels) {
     Declarator *decl;
 
     type = type_spec();
+    if (type == NULL) {
+        error_at(TOKEN(pos)->input, "intまたはcharでないトークンです(top_level)");
+    }
+
     decl = declarator(type);
 
     if (next_token_is('{')) {
