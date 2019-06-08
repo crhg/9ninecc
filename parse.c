@@ -865,7 +865,7 @@ Node *global_var_def(Declarator *decl, Initializer *init) {
     return node;
 }
 
-Node *init_declarator(Declarator *decl, Initializer *init) {
+Node *init_declarator_global(Declarator *decl, Initializer *init) {
     // いまのところはグローバル変数の定義だけ
     // そのうちtypedefとかも
     return global_var_def(decl, init);
@@ -993,8 +993,44 @@ Initializer *initializer() {
 }
 
 
+typedef struct DeclInit {
+    Declarator *decl;
+    Initializer *init;
+} DeclInit;
+
+DeclInit *decl_init(Declarator *decl, Initializer *init) {
+    DeclInit *ret = malloc(sizeof(DeclInit));
+    ret->decl = decl;
+    ret->init = init;
+    return ret;
+}
+
+// 変数定義の残りの部分
+//- <declaration_rest> ::=
+//-     ('=' <initializer>)? ( ';'| ',' <declarator> <declaration_rest>)
+// vecに結果を追加していく。
+void declaration_rest(Type *type, Declarator *decl, Vector *vec) {
+    if (consume('=')) {
+        Initializer *init = initializer();
+        vec_push(vec, decl_init(decl, init));
+    } else {
+        vec_push(vec, decl_init(decl, NULL));
+    }
+
+    if (consume(';')) {
+        return;
+    }
+
+    if (!consume(',')) {
+        error_at(TOKEN(pos)->input, "','でも';'でもないトークンです");
+    }
+
+    declaration_rest(type, declarator(type), vec);
+}
+
+
 //- <top_level> ::=
-//     <type_spec> <declarator> <function_definition>
+//     <type_spec> <declarator> <function_definition> # <function_definition>は'{'で開始する
 //   | <type_spec> <declarator> ('=' <initializer>)? (',' <declarator> ('=' <initializer>)?)* ';'
 void top_level(Vector *top_levels) {
     Type *type;
@@ -1012,23 +1048,11 @@ void top_level(Vector *top_levels) {
         return;
     }
 
-    for (;;) {
-        if (consume('=')) {
-            Initializer *init = initializer();
-            vec_push(top_levels, init_declarator(decl, init));
-        } else {
-            vec_push(top_levels, init_declarator(decl, NULL));
-        }
-
-        if (consume(';')) {
-            return;
-        }
-
-        if (!consume(',')) {
-            error_at(TOKEN(pos)->input, "','でも';'でもないトークンです");
-        }
-
-        decl = declarator(type);
+    Vector *decl_inits = new_vector();
+    declaration_rest(type, decl, decl_inits);
+    for (int i = 0; i < decl_inits->len; i++) {
+        DeclInit *decl_init = (DeclInit *)decl_inits->data[i];
+        vec_push(top_levels, init_declarator_global(decl_init->decl, decl_init->init));
     }
 }
 
