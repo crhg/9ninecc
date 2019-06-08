@@ -218,6 +218,68 @@ int  gen_lval(Node *node) {
     error_at_node(node, "代入の左辺値が変数ではありません");
 }
 
+void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
+    error("初期値リストによる初期化は未実装です");
+}
+
+void gen_local_var_scalar_init(Type *type, int offset, Initializer *init) {
+    if (init->ty != INITIALIZER_TYPE_EXPR) {
+        error("スカラー変数の初期化は式でなければなりません");
+    }
+
+    print_comment("ローカル変数初期化: lhs計算");
+    printf("  mov rax, rbp\n");
+    printf("  sub rax, %d\n", offset);
+    printf("  push rax\n");
+    stack_push(8);
+
+    print_comment("ローカル変数初期化: rhs計算");
+    gen(init->expr);
+
+    print_comment("ローカル変数初期化: ストア処理 ty=%s", tyToStr(type->ty));
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    stack_pop(16, NULL);
+
+    switch (type->ty) {
+        case INT:
+            printf("  mov [rax], edi\n");
+            break;
+        case CHAR:
+            printf("  mov [rax], dil\n");
+            break;
+        case PTR:
+            printf("  mov [rax], rdi\n");
+            break;
+        default:
+            error("不明な型: %d", type->ty);
+    }
+}
+
+void gen_local_var_def(Node *node) {
+    for (int i = 0; i < node->local_vars->len; i++) {
+        DeclInit *decl_init = node->decl_inits->data[i];
+        Declarator *decl = decl_init->decl;
+        Initializer *init = decl_init->init;
+
+        print_comment_start("gen_local_var_def name=%s", decl->id->name);
+        if (init == NULL) {
+            // 初期値がなければ何もしない
+            print_comment_end("初期値がないのでスキップ");
+            continue;
+        }
+
+        LocalVar *var = node->local_vars->data[i];
+        if (var->type->ty == ARRAY) {
+            gen_local_var_array_init(var->type, var->offset, init);
+        } else {
+            gen_local_var_scalar_init(var->type, var->offset, init);
+        }
+
+        print_comment_end("gen_local_var_def name=%s", decl->id->name);
+    }
+}
+
 void gen_global_var_init_data(Type *type, Initializer *init);
 
 void gen_global_array_init(Type *type, Initializer *init) {
@@ -467,6 +529,7 @@ void gen(Node *node) {
     if (node->ty == ND_LOCAL_VAR_DEF) {
         // 変数定義
         // 今のところ何もしない
+        gen_local_var_def(node);
         return;
     }
 

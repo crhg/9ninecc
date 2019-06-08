@@ -530,7 +530,7 @@ Node *local_var_def(Type *type) {
     }
 
     Node *node = new_node(ND_LOCAL_VAR_DEF, decl->id); // XXX: とりらえず最初の識別子トークンで代表
-    node->decllarators = vec;
+    node->decl_inits = vec;
     node->local_vars = local_vars;
 
     return node;
