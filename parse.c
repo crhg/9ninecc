@@ -513,25 +513,30 @@ Type *type_spec() {
 
 Declarator *declarator(Type *type);
 void declaration_rest(Type *type, Declarator *decl, Vector *vec);
+void determine_array_size(Type *type, Initializer *init);
 
 //- <local_var_def> ::=
 //-     <type_spec> <declarator> <declaration_rest>
 // <type_spec>は既に読まれた状態で呼ばれる。結果のtypeはパラメタでもらう
 Node *local_var_def(Type *type) {
     Declarator *decl = declarator(type);
-    Vector *vec = new_vector();
+    Vector *vec = new_vector(); // (DeclInit *)のベクター
 
     declaration_rest(type, decl, vec);
 
     Vector *local_vars = new_vector();
     for (int i = 0; i < vec->len; i++) {
-        Declarator *d = ((DeclInit *) vec->data[i])->decl;
+        DeclInit *decl_init = (DeclInit *) vec->data[i];
+        Declarator *d = decl_init->decl;
+        determine_array_size(d->type, decl_init->init);
         vec_push(local_vars, new_local_var(d->id->name, d->type));
     }
 
     Node *node = new_node(ND_LOCAL_VAR_DEF, decl->id); // XXX: とりらえず最初の識別子トークンで代表
     node->decl_inits = vec;
     node->local_vars = local_vars;
+
+    
 
     return node;
 }
@@ -749,21 +754,23 @@ Declarator *param_decl() {
 //-   | '(' (<param_decl> (,<param_decl>)*)? ')'
 Type *direct_declarator_rest(Type *type) {
     Token *token;
+    char incomplete_size;
     if ((token = consume('['))) {
         size_t size;
         if (next_token_is(']')) {
             size = 0;
+            incomplete_size = 1;
         } else {
             Node *e = expr();
             size = eval_constant_expr(e);
-
+            incomplete_size = 0;
         }
 
         if (!consume(']')) {
             error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
         }
 
-        Type *array_type = array_of(direct_declarator_rest(type), size, 0);
+        Type *array_type = array_of(direct_declarator_rest(type), size, incomplete_size);
         array_type->token = token;
         return array_type;
     }
@@ -827,46 +834,45 @@ Declarator *declarator(Type *type) {
     return direct_declarator(type);
 }
 
-int get_initializer_size(Initializer *init, int level) {
+int get_initializer_size(Initializer *init) {
     if (init == NULL) { return -1; }
 
-    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty ==ND_STRING && level == 0) {
+    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty ==ND_STRING) {
         return strlen(init->expr->token->str) + 1;
     }
 
     if (init->ty == INITIALIZER_TYPE_LIST) {
-        if (level == 0) {
-            return init->list->len;
-        }
-
-        int ret = 0;
-        for (int i = 0; i < init->list->len; i++) {
-            int size = get_initializer_size(init->list->data[i], level - 1);
-            if (size < 0) { return -1; }
-            if (size > ret) {
-                ret = size;
-            }
-        }
-
-        return ret;
+        return init->list->len;
     }
 
     return -1;
 }
 
 void determine_array_size(Type *type, Initializer *init) {
-    int level = 0;
-    while (type->ty == ARRAY && type->incomplete_size) {
-        int size = get_initializer_size(init, level);
-        if (size < 0) {
-            error("配列の要素数が確定しません");
-        }
-        type->array_size = size;
-        type->incomplete_size = 0;
-
-        type = type->ptrof;
-        level++;
+    if (!(type->ty == ARRAY && type->incomplete_size)) {
+        return;
     }
+
+    int size;
+    switch (init->ty) {
+        case INITIALIZER_TYPE_EXPR:
+            if (init->expr->ty != ND_STRING) {
+                error_at_node(init->expr, "文字列リテラル以外の式は配列の初期化に使えません");
+            }
+            size = strlen(init->expr->token->str) + 1;
+            break;
+        case INITIALIZER_TYPE_LIST:
+            size = init->list->len;
+            if (size == 0) {
+                error_at_token(type->token, "配列サイズが省略されているのに初期値リストが空");
+            }
+            break;
+        default:
+            error_at_token(type->token, "予期しないinitializer type: %d", init->ty);
+    }
+
+    type->array_size = size;
+    type->incomplete_size = 0;
 }
 
 Node *global_var_def(Declarator *decl, Initializer *init) {

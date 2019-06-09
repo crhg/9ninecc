@@ -264,6 +264,14 @@ void gen_local_var_zero(int offset, int size) {
 }
 
 void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
+    if (type->incomplete_size) {
+        error_at_token(type->token, "配列のサイズが確定していません");
+    }
+
+    if (type->array_size == 0) {
+        error_at_token(type->token, "配列のサイズが0です");
+    }
+
     if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty == ND_STRING) {
         char *s = init->expr->token->str;
         int size_of_s = strlen(s) + 1;

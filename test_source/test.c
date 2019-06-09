@@ -642,3 +642,17 @@ int test92() {
     return x[1];
 }
 // @end
+
+// @try_ret test93 1
+int test93() {
+    int x[] = {91, 92, 93};
+    return sizeof(x) == sizeof(x[0]) *3;
+}
+// @end
+
+// @try_ret test94 1
+int test94() {
+    char s[] = "hoge";
+    return sizeof(s) == 5;
+}
+// @end
