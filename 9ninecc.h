@@ -63,6 +63,7 @@ typedef struct Type {
     char incomplete_size; // 配列のサイズが未確定であることを示すフラグ
     struct Type *return_type; // FUNCのとき戻り値の型を示す
     Vector *params; // FUNCのときパラメタのベクター。要素はDeclarator
+    Token *token; // 宣言のときのみエラー表示用にトークンを保持する
 } Type;
 
 extern Type int_type;

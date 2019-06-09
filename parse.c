@@ -748,7 +748,8 @@ Declarator *param_decl() {
 //-   | '[' <expr>? ']' <direct_declarator_rest>
 //-   | '(' (<param_decl> (,<param_decl>)*)? ')'
 Type *direct_declarator_rest(Type *type) {
-    if (consume('[')) {
+    Token *token;
+    if ((token = consume('['))) {
         size_t size;
         if (next_token_is(']')) {
             size = 0;
@@ -762,10 +763,12 @@ Type *direct_declarator_rest(Type *type) {
             error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
         }
 
-        return array_of(direct_declarator_rest(type), size, 0);
+        Type *array_type = array_of(direct_declarator_rest(type), size, 0);
+        array_type->token = token;
+        return array_type;
     }
 
-    if (consume('(')) {
+    if ((token = consume('('))) {
         // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
         // TODO: ...には対応していない
         // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
@@ -781,7 +784,9 @@ Type *direct_declarator_rest(Type *type) {
             error_at(TOKEN(pos)->input, "')'でないトークンです(direct_declarator)");
         }
 
-        return function_of(direct_declarator_rest(type), params);
+        Type *function_type = function_of(direct_declarator_rest(type), params);
+        function_type->token = token;
+        return function_type;
     }
 
     return type;
@@ -812,8 +817,11 @@ Declarator *direct_declarator(Type *type) {
 
 //- <declarator> ::= '*' <declarator> | <direct_declarator>
 Declarator *declarator(Type *type) {
-    if (consume('*')) {
-        return declarator(pointer_of(type));
+    Token *token;
+    if ((token = consume('*'))) {
+        Declarator *decl = declarator(pointer_of(type));
+        type->token = token;
+        return decl;
     }
 
     return direct_declarator(type);
