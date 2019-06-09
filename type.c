@@ -83,7 +83,7 @@ int get_alignment(Type *type) {
 }
 
 // tyの文字列表記
-char *tyToStr(int ty) {
+char *tyToStr(TypeId ty) {
     switch (ty) {
         case CHAR:
             return "char";

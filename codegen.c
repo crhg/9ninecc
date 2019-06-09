@@ -133,7 +133,7 @@ char *reg_table[][4] = {
 };
 
 // レジスタ名の選択
-char * select_reg(int ty, Reg reg) {
+char * select_reg(TypeId ty, Reg reg) {
     RegSize reg_size;
     switch (ty) {
         case PTR:
@@ -181,7 +181,7 @@ void gen_strings(Vector *strings) {
 // アドレスをスタックトップにプッシュする
 // 型を返す
 // XXX: 厳密には配列変数はlvalではないがアドレスは同じように求まるので使用可能
-int  gen_lval(Node *node) {
+TypeId gen_lval(Node *node) {
     if (node->ty == ND_DEREF) {
         print_comment_start("gen_lval ND_LOCAL_VAR PTR to type=%s", typeToStr(node->ptrto->type));
         gen(node->ptrto);
@@ -695,7 +695,7 @@ void gen(Node *node) {
 
         // 代入
         print_comment("代入: lhs計算");
-        int ty = gen_lval(node->lhs);
+        TypeId ty = gen_lval(node->lhs);
         print_comment("代入: lhs type = %s", tyToStr(ty));
         print_comment("代入: rhs計算");
         gen(node->rhs);
@@ -887,7 +887,7 @@ void gen(Node *node) {
 
             // XXX: とりあえずr10は使って良さそうなので使ってみたが...
             LocalVar *param = ((Declarator *)node->type->params->data[i])->local_var;
-            int ty = param->type->ty;
+            TypeId ty = param->type->ty;
             printf("  mov r10, rbp\n");
             printf("  sub r10, %d\n", param->offset);
             Reg reg;

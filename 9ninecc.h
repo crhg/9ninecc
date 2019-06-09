@@ -56,8 +56,9 @@ typedef enum IdType {
 } IdType;
 
 // 型
+typedef enum TypeId {CHAR, INT, PTR, ARRAY, FUNC} TypeId;
 typedef struct Type {
-    enum TypeId { CHAR, INT, PTR, ARRAY, FUNC } ty;
+    TypeId ty;
     struct Type *ptrof; // PTRとARRAYのとき
     int len; // ARRAYのときの長さ(要素数)
     char incomplete_len; // 配列の長さが未確定であることを示すフラグ
@@ -74,7 +75,7 @@ Type *function_of(Type *type, Vector *params);
 int type_eq(Type *x, Type *y);
 int get_size_of(Type *type);
 int get_alignment(Type *type);
-char *tyToStr(int ty);
+char *tyToStr(TypeId ty);
 char *typeToStr(Type *type);
 
 // ローカル変数
