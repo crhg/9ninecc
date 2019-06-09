@@ -264,11 +264,11 @@ void gen_local_var_zero(int offset, int size) {
 }
 
 void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
-    if (type->incomplete_size) {
+    if (type->incomplete_len) {
         error_at_token(type->token, "配列のサイズが確定していません");
     }
 
-    if (type->array_size == 0) {
+    if (type->len == 0) {
         error_at_token(type->token, "配列のサイズが0です");
     }
 
@@ -277,11 +277,11 @@ void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
         int size_of_s = strlen(s) + 1;
 
         // 文字列リテラルが配列に収まりきらない場合
-        if (type->array_size < size_of_s - 1) {
+        if (type->len < size_of_s - 1) {
             warn_at_node(init->expr, "配列のサイズより長い文字列リテラルです");
         }
 
-        for (int i = 0; i < type->array_size; i++) {
+        for (int i = 0; i < type->len; i++) {
             int c = (i < size_of_s)? s[i]: 0;
             print_comment("ローカル変数初期化: offset=%d", i);
             printf("  mov rax, rbp\n");
@@ -294,16 +294,16 @@ void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
 
     Type *element_type = type->ptrof;
     int element_size = get_size_of(element_type);
-    int size = init->list->len < type->array_size? init->list->len: type->array_size;
+    int size = init->list->len < type->len? init->list->len: type->len;
     for (int i = 0; i < size; i++) {
         print_comment("ローカル変数初期化: offset=%d", i);
         gen_local_var_init(element_type, offset - element_size * i, init->list->data[i]);
     }
 
-    if (type->array_size > init->list->len) {
+    if (type->len > init->list->len) {
         gen_local_var_zero(
                 offset - element_size * init->list->len,
-                element_size * (type->array_size - init->list->len)
+                element_size * (type->len - init->list->len)
                 );
     }
 }
@@ -346,14 +346,14 @@ void gen_global_array_init(Type *type, Initializer *init) {
 
         char *s = init->expr->token->str;
 
-        if (type->array_size == 0) {
-            type->array_size = strlen(s) + 1;
+        if (type->len == 0) {
+            type->len = strlen(s) + 1;
         }
 
         // 文字列リテラルが配列に収まりきらない場合
-        if (type->array_size < strlen(s) + 1) {
-            printf("  .ascii \"%*s\"\n", type->array_size, s);
-            if (type->array_size < strlen(s)) {
+        if (type->len < strlen(s) + 1) {
+            printf("  .ascii \"%*s\"\n", type->len, s);
+            if (type->len < strlen(s)) {
                 warn_at_node(init->expr, "配列のサイズより長い文字列リテラルです");
             }
             return;
@@ -361,8 +361,8 @@ void gen_global_array_init(Type *type, Initializer *init) {
 
         printf("  .string \"%s\"\n", s);
 
-        if (type->array_size > strlen(s) + 1) {
-            printf("  .zero %ld\n", type->array_size - (strlen(s) + 1));
+        if (type->len > strlen(s) + 1) {
+            printf("  .zero %ld\n", type->len - (strlen(s) + 1));
         }
 
         return;
@@ -372,14 +372,14 @@ void gen_global_array_init(Type *type, Initializer *init) {
         error_at_node(init->expr, "配列を数値で初期化することはできません");
     }
 
-    if (type->array_size == 0) {
+    if (type->len == 0) {
         if (init->list->len == 0) {
             error("配列のサイズ指定がなくて初期化リストが空");
         }
-        type->array_size = init->list->len;
+        type->len = init->list->len;
     }
 
-    for (int i = 0; i < type->array_size; i++) {
+    for (int i = 0; i < type->len; i++) {
         if (i >= init->list->len) {
             // 初期化リストの項目数が足りないので残りを0で埋めて終わり
             printf("  .zero %d\n", ((i+1) - init->list->len ) * get_size_of(type->ptrof));
@@ -389,7 +389,7 @@ void gen_global_array_init(Type *type, Initializer *init) {
         gen_global_var_init_data(type->ptrof, init->list->data[i]);
     }
 
-    if (type->array_size < init->list->len) {
+    if (type->len < init->list->len) {
         warn("初期化リストの項目数が配列のサイズより多い");
     }
 }

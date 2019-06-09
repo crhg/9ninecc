@@ -470,12 +470,12 @@ Node *ptr_ident(Type *type) {
     Token *id;
     if ((id = consume(TK_IDENT)) != NULL) {
         if (consume('[')) {
-            Node *size_expr = expr();
+            Node *len_expr = expr();
             if (!consume(']')) {
                 error_at(TOKEN(pos)->input, "']'でないトークンです");
             }
 
-            type = array_of(type, eval_constant_expr(size_expr), 0);
+            type = array_of(type, eval_constant_expr(len_expr), 0);
         }
 
         node = new_node(ND_IDENT, id);
@@ -684,7 +684,7 @@ void dump_type(Type *type) {
     }
 
     if (type->ty == ARRAY) {
-        printf("array[%d] of ", type->array_size);
+        printf("array[%d] of ", type->len);
         dump_type(type->ptrof);
         return;
     }
@@ -754,23 +754,23 @@ Declarator *param_decl() {
 //-   | '(' (<param_decl> (,<param_decl>)*)? ')'
 Type *direct_declarator_rest(Type *type) {
     Token *token;
-    char incomplete_size;
+    char incomplete_len;
     if ((token = consume('['))) {
-        size_t size;
+        size_t len;
         if (next_token_is(']')) {
-            size = 0;
-            incomplete_size = 1;
+            len = 0;
+            incomplete_len = 1;
         } else {
             Node *e = expr();
-            size = eval_constant_expr(e);
-            incomplete_size = 0;
+            len = eval_constant_expr(e);
+            incomplete_len = 0;
         }
 
         if (!consume(']')) {
             error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
         }
 
-        Type *array_type = array_of(direct_declarator_rest(type), size, incomplete_size);
+        Type *array_type = array_of(direct_declarator_rest(type), len, incomplete_len);
         array_type->token = token;
         return array_type;
     }
@@ -849,7 +849,7 @@ int get_initializer_size(Initializer *init) {
 }
 
 void determine_array_size(Type *type, Initializer *init) {
-    if (!(type->ty == ARRAY && type->incomplete_size)) {
+    if (!(type->ty == ARRAY && type->incomplete_len)) {
         return;
     }
 
@@ -871,8 +871,8 @@ void determine_array_size(Type *type, Initializer *init) {
             error_at_token(type->token, "予期しないinitializer type: %d", init->ty);
     }
 
-    type->array_size = size;
-    type->incomplete_size = 0;
+    type->len = size;
+    type->incomplete_len = 0;
 }
 
 Node *global_var_def(Declarator *decl, Initializer *init) {

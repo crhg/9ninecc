@@ -14,12 +14,12 @@ Type *pointer_of(Type *type) {
 }
 
 // 配列の型
-Type *array_of(Type *type, int size, int incomplete_size) {
+Type *array_of(Type *type, int len, int incomplete_size) {
     Type *ret = malloc(sizeof(Type));
     ret->ty = ARRAY;
     ret->ptrof = type;
-    ret->array_size = size;
-    ret->incomplete_size = incomplete_size;
+    ret->len = len;
+    ret->incomplete_len = incomplete_size;
     return ret;
 }
 
@@ -60,7 +60,7 @@ int get_size_of(Type *type) {
         case PTR:
             return 8;
         case ARRAY:
-            return get_size_of(type->ptrof) * type->array_size;
+            return get_size_of(type->ptrof) * type->len;
         default:
             error("unknown type(get_size_of): %d", type->ty);
     }
