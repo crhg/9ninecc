@@ -98,7 +98,7 @@ int adjust_stack(int param_stack_size) {
         printf("  sub rsp, %d\n", adjust);
         stack_push(adjust);
     }
-    return adjust;;
+    return adjust;
 }
 
 // 関数呼び出し後のスタックの回復

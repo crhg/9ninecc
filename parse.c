@@ -488,15 +488,6 @@ Node *ptr_ident(Type *type) {
     error_at(TOKEN(pos)->input, "'*'でも'識別子'でもないトークンです");
 }
 
-LocalVar *find_local_var(Node *node) {
-    for (;;) {
-        if (node->ty == ND_IDENT) {
-            return node->local_var;
-        }
-        node = node->ptrto;
-    }
-}
-
 //- <type_spec> ::= int | char
 // 見つからなければnullを返す
 Type *type_spec() {
@@ -736,7 +727,7 @@ void dump_local_var(Map *map) {
 //          identifier-list:
 //                 identifier
 //                 identifier-list , identifier
-Declarator *declarator(Type *type);
+
 
 //- <param_decl> ::= <type_spec> <declarator>
 Declarator *param_decl() {
@@ -832,20 +823,6 @@ Declarator *declarator(Type *type) {
     }
 
     return direct_declarator(type);
-}
-
-int get_initializer_size(Initializer *init) {
-    if (init == NULL) { return -1; }
-
-    if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty ==ND_STRING) {
-        return strlen(init->expr->token->str) + 1;
-    }
-
-    if (init->ty == INITIALIZER_TYPE_LIST) {
-        return init->list->len;
-    }
-
-    return -1;
 }
 
 void determine_array_size(Type *type, Initializer *init) {
