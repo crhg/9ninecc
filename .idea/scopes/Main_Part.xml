@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="Main Part" pattern="file[9ninecc]:*/&amp;&amp;!file[9ninecc]:.idea//*&amp;&amp;!file[9ninecc]:docker//*&amp;&amp;!file[9ninecc]:test_source//*" />
+</component>
