@@ -107,6 +107,7 @@ typedef enum NodeType {
     ND_NE,        // !=
     ND_LE,        // <=
     ND_STRING,    // 文字列リテラル
+    ND_EMPTY,     // 空文
 } NodeType;
 
 

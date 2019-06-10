@@ -726,6 +726,10 @@ void gen(Node *node) {
         return;
     }
 
+    if (node->ty == ND_EMPTY) {
+        return;
+    }
+
     if (node->ty == ND_EXPR) {
         print_comment_start("ND_EXPR");
 

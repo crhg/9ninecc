@@ -656,3 +656,10 @@ int test94() {
     return sizeof(s) == 5;
 }
 // @end
+
+// @try_ret test95 0
+int test95() {
+    int x = 5;
+    while ((x = x - 1) > 0);
+    return x;
+}

@@ -629,10 +629,18 @@ Node *stmt() {
 
     if (consume(TK_RETURN)) {
         node = new_node_binop(ND_RETURN, expr(), NULL, NULL);
-    } else {
-        node = new_node_binop(ND_EXPR, expr(), NULL, NULL);
+        if (!consume(';'))
+            error_at_here("';'ではないトークンです");
+        return node;
     }
 
+    Token *token;
+    if ((token = consume(';'))) {
+        return new_node(ND_EMPTY, token);
+    }
+
+    // 残りは <expr> ';'のみ
+    node = new_node_binop(ND_EXPR, expr(), NULL, NULL);
     if (!consume(';'))
         error_at_here("';'ではないトークンです");
     return node;
