@@ -2,13 +2,15 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
-Type char_type = { CHAR };
-Type int_type = { INT };
+Type char_type = { .ty = CHAR, .size = 1, .alignment = 1, };
+Type int_type = { .ty = INT, .size = 4, .alignment = 4, };
 
 // ポインタの型
 Type *pointer_of(Type *type) {
     Type *ret = malloc(sizeof(Type));
     ret->ty = PTR;
+    ret->size = 8;
+    ret->alignment = 8;
     ret->ptrof = type;
     return ret;
 }
@@ -20,6 +22,8 @@ Type *array_of(Type *type, int len, int incomplete_size) {
     ret->ptrof = type;
     ret->len = len;
     ret->incomplete_len = incomplete_size;
+    ret->alignment = type->alignment;
+    ret->size = incomplete_size? 0: len * type->size;
     return ret;
 }
 
@@ -61,6 +65,8 @@ int get_size_of(Type *type) {
             return 8;
         case ARRAY:
             return get_size_of(type->ptrof) * type->len;
+        case STRUCT:
+            return type->size;
         default:
             error("unknown type(get_size_of): %d", type->ty);
     }
@@ -77,6 +83,8 @@ int get_alignment(Type *type) {
             return 8;
         case ARRAY:
             return get_alignment(type->ptrof);
+        case STRUCT:
+            return type->alignment;
         default:
             error("unknown type(get_alignment): %d", type->ty);
     }

@@ -33,6 +33,7 @@ enum {
     TK_CHAR,
     TK_INT,
     TK_SIZEOF,
+    TK_STRUCT,
     TK_EQ,        // ==
     TK_NE,        // !=
     TK_LE,        // <=
@@ -56,16 +57,32 @@ typedef enum IdType {
 } IdType;
 
 // 型
-typedef enum TypeId {CHAR, INT, PTR, ARRAY, FUNC} TypeId;
+typedef enum TypeId {CHAR, INT, PTR, ARRAY, FUNC, STRUCT} TypeId;
 typedef struct Type {
     TypeId ty;
+
+    int size;
+    int alignment;
+
     struct Type *ptrof; // PTRとARRAYのとき
+
     int len; // ARRAYのときの長さ(要素数)
     char incomplete_len; // 配列の長さが未確定であることを示すフラグ
+
     struct Type *return_type; // FUNCのとき戻り値の型を示す
     Vector *params; // FUNCのときパラメタのベクター。要素はDeclarator
+
+    Map *fields;     // STRUCTのときフィールドのマップ,フィールド名→(Field *)
+    int next_offset; // STRUCTのとき次のオフセット
+
     Token *token; // 宣言のときのみエラー表示用にトークンを保持する
 } Type;
+
+// 構造体のフィールド情報
+typedef struct Field {
+    Type *type;
+    int offset;
+} Field;
 
 extern Type int_type;
 extern Type char_type;

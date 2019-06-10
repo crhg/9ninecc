@@ -490,7 +490,10 @@ Node *ptr_ident(Type *type) {
 
 //- <type_spec> ::= int | char
 // 見つからなければnullを返す
+Declarator *declarator(Type *type);
+void add_field(Type *type, Declarator *decl);
 Type *type_spec() {
+    Token *token;
     if (consume(TK_INT)) {
         return &int_type;
     }
@@ -498,11 +501,65 @@ Type *type_spec() {
     if (consume(TK_CHAR)) {
         return &char_type;
     }
+    
+    if ((token = consume(TK_STRUCT))) {
+        if (!consume('{')) {
+            error_at_here("'{'がありません");
+        }
+        
+        Type *type = malloc(sizeof(Type));
+        type->ty = STRUCT;
+        type->token = token;
+        type->fields = new_map();
+        type->alignment = 1;
+        type->size = 0;
+        type->next_offset = 0;
+        
+        while (!consume('}')) {
+            Type *field_type = type_spec();
+            if (field_type == NULL) {
+                error_at_here("フィールドの型がありません");
+            }
+            
+            Declarator *decl;
+            decl = declarator(field_type);
+            add_field(type, decl);
+            
+            while (consume(',')) {
+                decl = declarator(field_type);
+                add_field(type, decl);
+            }
+            
+            if (!consume(';')) {
+                error_at_here("';'がありません");
+            }
+        }
+        
+        return type;
+    }
 
     return NULL;
 }
 
-Declarator *declarator(Type *type);
+// 構造体型にフィールドを追加します
+void add_field(Type *type, Declarator *decl) {
+    if (map_get(type->fields, decl->id->name)) {
+        error_at_token(decl->id, "二重定義です");
+    }
+
+    int alignment = get_alignment(decl->type);
+    int offset = round_up(type->next_offset, alignment);
+
+    type->alignment = max(type->alignment, alignment);
+    type->next_offset = offset + get_size_of(decl->type);
+    type->size = round_up(type->next_offset, type->alignment);
+
+    Field *field = malloc(sizeof(Field));
+    field->type = decl->type;
+    field->offset = offset;
+    map_put(type->fields, decl->id->name, field);
+}
+
 void declaration_rest(Type *type, Declarator *decl, Vector *vec);
 void determine_array_size(Type *type, Initializer *init);
 
@@ -835,17 +892,17 @@ void determine_array_size(Type *type, Initializer *init) {
         return;
     }
 
-    int size;
+    int len;
     switch (init->ty) {
         case INITIALIZER_TYPE_EXPR:
             if (init->expr->ty != ND_STRING) {
                 error_at_node(init->expr, "文字列リテラル以外の式は配列の初期化に使えません");
             }
-            size = strlen(init->expr->token->str) + 1;
+            len = strlen(init->expr->token->str) + 1;
             break;
         case INITIALIZER_TYPE_LIST:
-            size = init->list->len;
-            if (size == 0) {
+            len = init->list->len;
+            if (len == 0) {
                 error_at_token(type->token, "配列サイズが省略されているのに初期値リストが空");
             }
             break;
@@ -853,7 +910,8 @@ void determine_array_size(Type *type, Initializer *init) {
             error_at_token(type->token, "予期しないinitializer type: %d", init->ty);
     }
 
-    type->len = size;
+    type->len = len;
+    type->size = len * type->ptrof->size;
     type->incomplete_len = 0;
 }
 

@@ -518,11 +518,11 @@ int test75() {
 // @end
 
 // @try_out test76 10
-int a;
-int f76(int x) { a = x; }
+int a76;
+int f76(int x) { a76 = x; }
 int test76() {
   f76(10);
-  pr_int(a);
+  pr_int(a76);
 }
 // @end
 
@@ -663,3 +663,14 @@ int test95() {
     while ((x = x - 1) > 0);
     return x;
 }
+// @end
+
+// @try_ret test96 8
+int test96() {
+    struct {
+        int x;
+        int y;
+    } a;
+    return sizeof(a);
+}
+// @end

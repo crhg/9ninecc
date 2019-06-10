@@ -1,5 +1,5 @@
 * [ ] struct
-    * [ ] tagなしのstructの変数定義
+    * [x] tagなしのstructの変数定義
     * [ ] フィールドの読み書き
     * [ ] tagつきのstruct
     * [ ] 変数を定義しないstruct
