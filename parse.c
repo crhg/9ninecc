@@ -223,6 +223,8 @@ Node *term() {
     error_at_here("数値でも開きカッコでも識別子でもないトークンです");
 }
 
+Node *new_node_arrow(Node *term, Token *field_name, Field *field, Token *token);
+
 //- <array_term>> ::= <term> ('[' <expr> ']' | '->' <ident> | '.' <ident> ))*
 Node *array_term() {
     Node *node = term();
@@ -253,12 +255,24 @@ Node *array_term() {
                 error_at_token(field_name, "存在しないフィールド名です");
             }
 
-            Node *arrow = new_node(ND_ARROW, token);
-            arrow->term = node;
-            arrow->field_name = field_name;
-            arrow->field = field;
-            arrow->type = field->type;
-            node = new_node_deref(new_node_get_ptr(arrow, token), token);
+            node = new_node_arrow(node, field_name, field, token);
+            continue;
+        }
+
+        if ((token = consume('.'))) {
+            assert_at_node(node, node->type != NULL, "型が不明です");
+            if (!(node->type->ty == STRUCT)) {
+                error_at_token(token, "左辺がstructでない");
+            }
+
+            Token *field_name = consume(TK_IDENT);
+            Field *field = map_get(node->type->fields, field_name->name);
+            if (field == NULL) {
+                error_at_token(field_name, "存在しないフィールド名です");
+            }
+
+            // x.y を (&x)->y として扱う
+            node = new_node_arrow(new_node_get_ptr(node, token), field_name, field, token);
             continue;
         }
 
@@ -266,6 +280,16 @@ Node *array_term() {
     }
 
     return node;
+}
+
+Node *new_node_arrow(Node *term, Token *field_name, Field *field, Token *token) {
+    Node *arrow = new_node(ND_ARROW, token);
+    arrow->term = term;
+    arrow->field_name = field_name;
+    arrow->field = field;
+    arrow->type = field->type;
+    term = new_node_deref(new_node_get_ptr(arrow, token), token);
+    return term;
 }
 
 //- <pointer_term> = <array_term> | ('*' | '&') <pointer_term>

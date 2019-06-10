@@ -686,3 +686,15 @@ int test97() {
     return (&a)->x + (&a)->y;
 }
 // @end
+
+// @try_ret test98 98
+int test98() {
+    struct {
+        int x;
+        int y;
+    } a;
+    a.x = 90;
+    a.y = 8;
+    return a.x + a.y;
+}
+// @end
