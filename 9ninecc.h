@@ -193,6 +193,8 @@ void warn(char *fmt, ...);
 // エラー箇所を報告するための関数
 _Noreturn void error_at(char *loc, char *fmt, ...);
 void warn_at(char *loc, char *fmt, ...);
+_Noreturn void error_at_here(char *fmt, ...);
+void warn_at_here(char *fmt, ...);
 _Noreturn void error_at_token(Token *token, char *fmt, ...);
 void warn_at_token(Token *token, char *fmt, ...);
 _Noreturn void error_at_node(Node *node, char *fmt, ...);

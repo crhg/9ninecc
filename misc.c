@@ -83,6 +83,27 @@ void warn_at(char *loc, char *fmt, ...) {
     va_end(ap);
 }
 
+void vwarn_at_here(char *fmt, va_list args) {
+    vwarn_at(TOKEN(pos)->input, fmt, args);
+}
+
+// 現在位置のトークンでエラー
+void error_at_here(char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at_here(fmt, ap);
+    va_end(ap);
+    exit(1);
+}
+
+// 現在位置のトークンで警告
+void warn_at_here(char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vwarn_at_here(fmt, ap);
+    va_end(ap);
+}
+
 void vwarn_at_token(Token *token, char *fmt, va_list args) {
     if (token) {
         vwarn_at(token->input, fmt, args);

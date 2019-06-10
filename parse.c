@@ -165,7 +165,7 @@ Node *term() {
     if (consume('(')) {
         Node *node_expr = expr();
         if (!consume(')'))
-            error_at(TOKEN(pos)->input, "開きカッコに対応する閉じカッコがありません");
+            error_at_here("開きカッコに対応する閉じカッコがありません");
         return node_expr;
     }
 
@@ -203,13 +203,13 @@ Node *term() {
             }
 
             if (!consume(')'))
-                error_at(TOKEN(pos)->input, "閉じカッコがありません");
+                error_at_here("閉じカッコがありません");
 
             return node;
         }
     }
 
-    error_at(TOKEN(pos)->input, "数値でも開きカッコでも識別子でもないトークンです");
+    error_at_here("数値でも開きカッコでも識別子でもないトークンです");
 }
 
 //- <array_term>> ::= <term> ('[' <expr> ']')*
@@ -422,7 +422,7 @@ Node *stmt();
 //- <block> ::= '{' <stmt>* '}'
 Node *block() {
     if (!consume('{')) {
-        error_at(TOKEN(pos)->input, "'{'でないトークンです2");
+        error_at_here("'{'でないトークンです2");
     }
 
     Node *node = new_node(ND_BLOCK, NULL);
@@ -472,7 +472,7 @@ Node *ptr_ident(Type *type) {
         if (consume('[')) {
             Node *len_expr = expr();
             if (!consume(']')) {
-                error_at(TOKEN(pos)->input, "']'でないトークンです");
+                error_at_here("']'でないトークンです");
             }
 
             type = array_of(type, eval_constant_expr(len_expr), 0);
@@ -485,7 +485,7 @@ Node *ptr_ident(Type *type) {
         return node;
     }
 
-    error_at(TOKEN(pos)->input, "'*'でも'識別子'でもないトークンです");
+    error_at_here("'*'でも'識別子'でもないトークンです");
 }
 
 //- <type_spec> ::= int | char
@@ -548,12 +548,12 @@ Node *stmt() {
         node = new_node(ND_IF, NULL);
 
         if (!consume('('))
-            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+            error_at_here("'('ではないトークンです");
 
         node->cond = expr();
 
         if (!consume(')'))
-            error_at(TOKEN(pos)->input, "')'ではないトークンです");
+            error_at_here("')'ではないトークンです");
 
         node->stmt = stmt();
 
@@ -570,12 +570,12 @@ Node *stmt() {
         node = new_node(ND_WHILE, NULL);
 
         if (!consume('('))
-            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+            error_at_here("'('ではないトークンです");
 
         node->cond = expr();
 
         if (!consume(')'))
-            error_at(TOKEN(pos)->input, "')'ではないトークンです");
+            error_at_here("')'ではないトークンです");
 
         node->stmt = stmt();
 
@@ -586,14 +586,14 @@ Node *stmt() {
         node = new_node(ND_FOR, NULL);
 
         if (!consume('('))
-            error_at(TOKEN(pos)->input, "'('ではないトークンです");
+            error_at_here("'('ではないトークンです");
 
         if (consume(';')) {
             node->init = NULL;
         } else {
             node->init = expr();
             if (!consume(';'))
-                error_at(TOKEN(pos)->input, "';'ではないトークンです");
+                error_at_here("';'ではないトークンです");
         }
 
         if (consume(';')) {
@@ -601,7 +601,7 @@ Node *stmt() {
         } else {
             node->cond = expr();
             if (!consume(';'))
-                error_at(TOKEN(pos)->input, "';'ではないトークンです");
+                error_at_here("';'ではないトークンです");
         }
 
         if (consume(')')) {
@@ -609,7 +609,7 @@ Node *stmt() {
         } else {
             node->next = expr();
             if (!consume(')'))
-                error_at(TOKEN(pos)->input, "')'ではないトークンです");
+                error_at_here("')'ではないトークンです");
         }
 
         node->stmt = stmt();
@@ -634,7 +634,7 @@ Node *stmt() {
     }
 
     if (!consume(';'))
-        error_at(TOKEN(pos)->input, "';'ではないトークンです");
+        error_at_here("';'ではないトークンです");
     return node;
 }
 
@@ -733,7 +733,7 @@ void dump_local_var(Map *map) {
 Declarator *param_decl() {
     Type *type = type_spec();
     if (type == NULL) {
-        error_at(TOKEN(pos)->input, "intまたはcharでないトークンです(param_decl)");
+        error_at_here("intまたはcharでないトークンです(param_decl)");
     }
 
     return declarator(type);
@@ -758,7 +758,7 @@ Type *direct_declarator_rest(Type *type) {
         }
 
         if (!consume(']')) {
-            error_at(TOKEN(pos)->input, "']'でないトークンです(direct_declarator)");
+            error_at_here("']'でないトークンです(direct_declarator)");
         }
 
         Type *array_type = array_of(direct_declarator_rest(type), len, incomplete_len);
@@ -779,7 +779,7 @@ Type *direct_declarator_rest(Type *type) {
         }
 
         if (!consume(')')) {
-            error_at(TOKEN(pos)->input, "')'でないトークンです(direct_declarator)");
+            error_at_here("')'でないトークンです(direct_declarator)");
         }
 
         Type *function_type = function_of(direct_declarator_rest(type), params);
@@ -799,13 +799,13 @@ Declarator *direct_declarator(Type *type) {
     if (consume('(')) {
         decl = declarator(NULL);
         if (!consume(')')) {
-            error_at(TOKEN(pos)->input, "'('でないトークンです(direct_declarator)");
+            error_at_here("'('でないトークンです(direct_declarator)");
         }
     } else if ((id = consume(TK_IDENT)) != NULL) {
         decl = malloc(sizeof(Declarator));
         decl->id = id;
     } else {
-        error_at(TOKEN(pos)->input, "識別子でも'('でもないトークンです(direct_declarator)");
+        error_at_here("識別子でも'('でもないトークンです(direct_declarator)");
     }
 
 
@@ -983,7 +983,7 @@ Initializer *initializer() {
             }
 
             if (!consume(',')) {
-                error_at(TOKEN(pos)->input, "','でも'}'でもないトークンです");
+                error_at_here("','でも'}'でもないトークンです");
             }
         }
         ret->list = list;
@@ -1020,7 +1020,7 @@ void declaration_rest(Type *type, Declarator *decl, Vector *vec) {
     }
 
     if (!consume(',')) {
-        error_at(TOKEN(pos)->input, "','でも';'でもないトークンです");
+        error_at_here("','でも';'でもないトークンです");
     }
 
     declaration_rest(type, declarator(type), vec);
@@ -1036,7 +1036,7 @@ void top_level(Vector *top_levels) {
 
     type = type_spec();
     if (type == NULL) {
-        error_at(TOKEN(pos)->input, "intまたはcharでないトークンです(top_level)");
+        error_at_here("intまたはcharでないトークンです(top_level)");
     }
 
     decl = declarator(type);
