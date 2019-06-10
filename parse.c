@@ -656,10 +656,7 @@ void allocate_local_var(Map *map) {
         int size = get_size_of(var->type);
         int alignment = get_alignment(var->type);
 
-        offset += size;
-        if (offset % alignment != 0) {
-            offset += (size - offset % alignment);
-        }
+        offset = round_up(offset + size, alignment);
 
         var->offset = offset;
     }

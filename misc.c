@@ -12,6 +12,23 @@ int is_alnum(char c) {
            (c == '_');
 }
 
+// xをmで割り切れるように切り上げる
+int round_up(int x, int m) {
+    if (x % m == 0) {
+        return x;
+    }
+
+    return x - (x % m) + m;
+}
+
+int max(int x, int y) {
+    if (x > y) {
+        return x;
+    }
+
+    return y;
+}
+
 // エラー・警告表示関数群
 
 // エラーを報告するための関数
