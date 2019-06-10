@@ -122,7 +122,7 @@ Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
     return node;
 }
 
-Node *new_node_ptr(Node *pt, Token *token) {
+Node *new_node_deref(Node *pt, Token *token) {
     pt = conv_a_to_p(pt);
 
     if (pt->type->ty != PTR) {
@@ -136,6 +136,13 @@ Node *new_node_ptr(Node *pt, Token *token) {
     return node;
 }
 
+Node *new_node_get_ptr(Node *pt, Token *token) {
+    Node *node = new_node(ND_GET_PTR, token);
+    node->ptrof = pt;
+    node->type = pointer_of(pt->type);
+    return node;
+}
+
 // lvalueか判定
 int is_lvalue(Node * node) {
     if (node->ty == ND_LOCAL_VAR || node->ty == ND_GLOBAL_VAR) {
@@ -143,6 +150,10 @@ int is_lvalue(Node * node) {
     }
 
     if (node->ty == ND_DEREF) {
+        return 1;
+    }
+
+    if (node->ty == ND_ARROW) {
         return 1;
     }
 
@@ -212,19 +223,46 @@ Node *term() {
     error_at_here("数値でも開きカッコでも識別子でもないトークンです");
 }
 
-//- <array_term>> ::= <term> ('[' <expr> ']')*
+//- <array_term>> ::= <term> ('[' <expr> ']' | '->' <ident> | '.' <ident> ))*
 Node *array_term() {
     Node *node = term();
 
     Token *token;
-    while ((token = consume('['))) {
-        Node *e = expr();
+    for (;;) {
+        if ((token = consume('['))) {
+            Node *e = expr();
 
-        if (!consume(']')) {
-            error_at(token->input, "']'がありません");
+            if (!consume(']')) {
+                error_at(token->input, "']'がありません");
+            }
+
+            node = new_node_deref(new_node_add(node, e, token), token);
+
+            continue;
         }
 
-        node = new_node_ptr(new_node_add(node, e, token), token);
+        if ((token = consume(TK_ARROW))) {
+            assert_at_node(node, node->type != NULL, "型が不明です");
+            if (!(node->type->ty == PTR && node->type->ptrof->ty == STRUCT)) {
+                error_at_token(token, "左辺がstructへのポインタでない");
+            }
+
+            Token *field_name = consume(TK_IDENT);
+            Field *field = map_get(node->type->ptrof->fields, field_name->name);
+            if (field == NULL) {
+                error_at_token(field_name, "存在しないフィールド名です");
+            }
+
+            Node *arrow = new_node(ND_ARROW, token);
+            arrow->term = node;
+            arrow->field_name = field_name;
+            arrow->field = field;
+            arrow->type = field->type;
+            node = new_node_deref(new_node_get_ptr(arrow, token), token);
+            continue;
+        }
+
+        break;
     }
 
     return node;
@@ -234,7 +272,7 @@ Node *array_term() {
 Node *pointer_term() {
     Token *token;
     if ((token = consume('*'))) {
-        return new_node_ptr(pointer_term(), token);
+        return new_node_deref(pointer_term(), token);
     }
 
     if ((token = consume('&'))) {
@@ -248,14 +286,13 @@ Node *pointer_term() {
             error_at_node(pt, "lvalueでありません: %d", pt->ty);
         }
 
-        Node *node = new_node(ND_GET_PTR, token);
-        node->ptrof = pt;
-        node->type = pointer_of(pt->type);
-        return node;
+        return new_node_get_ptr(pt, token);
     }
 
     return array_term();
 }
+
+
 
 //- <unary> ::= sizeof <unary>
 //-           | ('+'|'-') <pointer_term>

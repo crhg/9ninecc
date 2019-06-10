@@ -110,12 +110,23 @@ void tokenize() {
             continue;
         }
 
-        if (*p == '+' || *p == '-' || *p == '*' || *p == '/'
+        if (*p == '+' || *p == '*' || *p == '/'
                 || *p == '&'
                 || *p == '(' || *p == ')' || *p == ';' || *p == ','
                 || *p == '{' || *p == '}'
                 || *p == '[' || *p == ']'
         ) {
+            push_token(*p, p);
+            p++;
+            continue;
+        }
+
+        if (*p == '-') {
+            if (*(p+1) == '>') {
+                push_token(TK_ARROW, p);
+                p+=2;
+                continue;
+            }
             push_token(*p, p);
             p++;
             continue;

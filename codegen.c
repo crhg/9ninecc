@@ -189,6 +189,19 @@ TypeId gen_lval(Node *node) {
         return node->type->ty;
     }
 
+    if (node->ty == ND_ARROW) {
+        // TODO: offsetが0のときはコード生成しない方がいい?
+        print_comment_start("gen_lval ND_ARROW type=%s, field=%s", typeToStr(node->term->type), node->field_name->name);
+        gen(node->term);
+        printf("  pop rax\n");
+        stack_pop(8, node);
+        printf("  add rax, %d # %s\n", node->field->offset, node->field_name->name);
+        printf("  push rax\n");
+        stack_push(8);
+        print_comment_end("gen_lval ND_ARROW");
+        return node->field->type->ty;
+    }
+
     if (node->ty == ND_LOCAL_VAR) {
         print_comment_start("gen_lval ND_LOCAL_VAR %s type=%s", node->token->name, typeToStr(node->type));
 

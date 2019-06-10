@@ -39,6 +39,7 @@ enum {
     TK_LE,        // <=
     TK_GE,        // >=
     TK_STRING,    // 文字列リテラル
+    TK_ARROW,     // ->
 };
 
 // トークンの型
@@ -125,6 +126,7 @@ typedef enum NodeType {
     ND_LE,        // <=
     ND_STRING,    // 文字列リテラル
     ND_EMPTY,     // 空文
+    ND_ARROW,     // ->
 } NodeType;
 
 
@@ -157,6 +159,10 @@ typedef struct Node {
     struct Initializer *initializer; // 変数定義のときの初期化子
     Vector *decl_inits; // ND_LOCAL_VAR_DEFのときのDeclaratorのベクタ
     Vector *local_vars;   // ND_LOCAL_VAR_DEFのときのLocalVarのベクタ
+
+    struct Node *term;  // ND_ARROWのときにtermが入る
+    Field *field;       // ND_ARROWのときに(Field *)が入る
+    Token *field_name;  // ND_ARROWのときに識別子が入る
 } Node;
 
 typedef struct Declarator {

@@ -101,6 +101,8 @@ char *tyToStr(TypeId ty) {
             return "ptr";
         case ARRAY:
             return "array";
+        case STRUCT:
+            return "struct";
         default:
             error("unknown type(tyToStr): %d", ty);
     }

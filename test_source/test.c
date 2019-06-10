@@ -674,3 +674,15 @@ int test96() {
     return sizeof(a);
 }
 // @end
+
+// @try_ret test97 97
+int test97() {
+    struct {
+        int x;
+        int y;
+    } a;
+    (&a)->x = 90;
+    (&a)->y = 7;
+    return (&a)->x + (&a)->y;
+}
+// @end
