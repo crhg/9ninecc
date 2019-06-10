@@ -288,6 +288,8 @@ Node *new_node_arrow(Node *term, Token *field_name, Field *field, Token *token) 
     arrow->field_name = field_name;
     arrow->field = field;
     arrow->type = field->type;
+
+    // x->yのlvalしか定義してないので一般のx->yは*(&(x->y))に変形しておく
     term = new_node_deref(new_node_get_ptr(arrow, token), token);
     return term;
 }
