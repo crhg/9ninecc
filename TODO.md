@@ -6,10 +6,16 @@
     * [ ] tagつきのstruct
     * [ ] 変数を定義しないstruct
     * [ ] 最後のフィールドにだけ使えるサイズ無し配列
+    * [ ] 初期化
+        * [ ] リストで初期化
+        * [ ] .field = 値
 * [ ] union
 * [ ] typedef
 * [ ] enum
 * [ ] break
+    * [ ] while
+    * [ ] for
+* [ ] continue
     * [ ] while
     * [ ] for
 * [ ] switch
