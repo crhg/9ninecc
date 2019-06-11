@@ -404,7 +404,7 @@ int test79() {
 
 Type型にFUNCが入ってだいぶそれっぽくなった。
 
-#### 初期値対応: 既存のテストはパス(https://github.com/crhg/9ninecc/commit/5123492ab5cfb9552700b9966bfdf3baa4414448)
+#### [初期値対応: 既存のテストはパス](https://github.com/crhg/9ninecc/commit/5123492ab5cfb9552700b9966bfdf3baa4414448)
 
 初期化を使わない既存のテストコードが通るようになったのでいったんコミット。
 
@@ -413,11 +413,11 @@ Type型にFUNCが入ってだいぶそれっぽくなった。
 Mac上のCLionなので9nineccの出力するコードはそのままでは実行できないから、CLion上でテストコードをコンパイルできるようになるまではMac上で、
 結果のコードの実行確認はlinuxにコピーして行うという感じの作業にした。CLionはcmakeなのでMakefileは見ないからちょうどいい。
 
-#### インスペクターに怒られるところを修正(https://github.com/crhg/9ninecc/commit/540c91dd7a910128459320acd45ecc96bda15183)
+#### [インスペクターに怒られるところを修正](https://github.com/crhg/9ninecc/commit/540c91dd7a910128459320acd45ecc96bda15183)
 
 CLionのインスペクターがあやしいところを指摘してくれるので徐々に修正。
 
-#### 重複した宣言を削除(https://github.com/crhg/9ninecc/commit/38c2127952b90c8ae80936479ebf2321939ab06d)
+#### [重複した宣言を削除](https://github.com/crhg/9ninecc/commit/38c2127952b90c8ae80936479ebf2321939ab06d)
 
 CLionに宣言がだぶっていると指摘されたので削除
 
@@ -500,6 +500,9 @@ int *p = a;
 char *s = "hoge" + 1;
 ```
 
+グローバル変数の初期値は最終的にアセンブラに落とした段階でラベル+整数になってなければいけないということなので、
+ラベルと整数の組を結果とする式の評価関数を作ってみた。
+
 加減算以外の演算子は面倒なので積み残し。
 
 比較演算子とポインタがからむと面倒そうであった。gccで試したところ
@@ -540,3 +543,125 @@ warnだけ9ninecc.hの中で記述箇所が離れていたので修正漏れ。
 #### [グローバル変数の初期化リストによる初期化](https://github.com/crhg/9ninecc/commit/1a0e19eed5f432a5805094681cd9a7c28cd25526)
 
 配列の初期化に対応。
+
+#### [Merge pull request #1 from crhg/initializer](https://github.com/crhg/9ninecc/commit/04f1acf99febc3c521400489a115b3e57926eb77)
+
+グローバル変数の初期化対応は一通り終わったのでmasterにマージ。
+
+## 2019-06-08
+
+今度はローカル変数の初期化を行う
+
+### [type_specの先読み対応](https://github.com/crhg/9ninecc/commit/deb05381fc0fb5e6c102eb4158c208a0e08740c3)
+
+いままでは`type_spec`を呼び出す前に次のトークンが`int`か`char`であることを調べていたが、
+`type_spec`が`NULL`を返すようにして先に調べなくて良いように変更。
+
+### [変数定義の後半部分を関数にくくり出す](https://github.com/crhg/9ninecc/commit/2f0f71a263ce6bace7cd38ae763f16ac8a415a85)
+
+グローバル変数の初期化対応で作成した部分だがローカル変数の初期化も同じような処理が必要なので共通で使えそうな
+部分を関数でくくり出した。
+
+## 2019-06-09
+
+### [DeclInitのtypedefを9ninecc.hに移動](https://github.com/crhg/9ninecc/commit/1cded0f2d18af045fde7e98e0211e0ae2adb6127)
+
+### [ローカル変数宣言をdeclaratorを使って書き直し](https://github.com/crhg/9ninecc/commit/b5bc3a4f50d35835b77b7b30e2e9e73438f95781)
+
+ローカル変数宣言を先にくくりだしておいた関数を使って書き直し。
+
+### [スカラー型のローカル変数の初期化](https://github.com/crhg/9ninecc/commit/ff05aa7de8ec45ec7297e13c3a3cf31389a62f71)
+
+いままでなにもコード生成していなかった`ND_LOCAL_VAR`ノードに`Declarator`のベクタを追加して
+初期値設定のコードを生成するようにした。
+
+### [配列型のローカル変数の初期化](https://github.com/crhg/9ninecc/commit/4abeb83057f85955f2e869ba49867969b6c856a3)
+
+やっていることはグローバル変数のときと似ていて、以下のように処理をローカル変数用に置き換えた感じ。
+
+* 式の値を評価するかわりに計算するコードを生成
+* それをアセンブラの定数にするのではなく決められたスタックフレームのオフセットに保存するコードを生成
+* 初期値が足りない部分をゼロで埋めるコードを生成
+
+ゼロ埋めはいい方法が思いつかなかったのでとりあえず`bzero`コールで。
+
+### [宣言のときTypeにトークンを持たせる(エラー表示用)](https://github.com/crhg/9ninecc/commit/0fa969efae43625c22fa0c3849af9cb9bb47d975)
+
+型のまわりでエラーがでるとソースのどこに対応するかわかりにくかったので、エラー表示用にトークンを保持するようにした。
+
+### [サイズを省略した配列の初期化](https://github.com/crhg/9ninecc/commit/e52e783b3ea2e06eb6c19c43dbfb8ae7066fadfe)
+
+とりあえず書いてはみたがサイズ省略周りはまだちゃんと理解できてない感じ。
+
+### [配列の長さと配列のバイト数が混乱しがちなので長さはlen,バイト数はsizeにする。](https://github.com/crhg/9ninecc/commit/d5873a1d78b3de61b0ada68f4f1ef17d913f5f5e)
+
+配列の長さ(=要素数)の意味でサイズを使うとデータのバイト数のサイズと混乱しがちなので、配列の長さはlenを使うように統一。
+
+### [不要コードの整理](https://github.com/crhg/9ninecc/commit/3e4d7cb52a0431bddf89ee94b9991dc287b82e99)
+
+コミットログ間違えてるのに気がついたが直し方がわからない。
+
+### [CLionで補完が効くようにするためTypeのtyのenum定義を外に出す](https://github.com/crhg/9ninecc/commit/644818fe1b28833b3917817d28dfab3aa85d0e7e)
+
+### [Inspection Scopeの設定](https://github.com/crhg/9ninecc/commit/40358ee932ee64660e53e01b0a360d2abcd40568)
+
+これもコミットログが変。
+
+CLionのAnalyzeを全ソースにするとtest_source以下のコードがひっかかりまくるので、コンパイラ本体の
+コードのみのスコープを定義した。
+
+## 2019-06-10
+
+### [TODOリストを追加](https://github.com/crhg/9ninecc/commit/f40efb37e1e0ae1d4d27f9f39d71363d9bcf2a6a)
+
+いままではテキストに従えば良かったがここから先は手探りなので、TODOリストを作成して見ながら行うようにする。
+
+### [現在位置のトークンのエラーを楽に書くためerror_at_here, warn_at_hereを作って置き換え](https://github.com/crhg/9ninecc/commit/c435d6e353dc038c1d0e31ef9f6981574807169f)
+
+`error_at(TOKEN(pos)->input,...)`はTOKENのあとを手書きするのが面倒になってきたので`error_at_here(...)`等を作成。
+これだとコード補完できるので楽。
+
+### [空文](https://github.com/crhg/9ninecc/commit/e4a2a55645f58fb65b323ad3af6aef1429d60fd0)
+
+TODO作ったときに空文は一瞬でできそうだなと思ったので作成。
+
+### [round_up関数を作ってローカル変数のオフセット計算を整理](https://github.com/crhg/9ninecc/commit/69592b25f20164775a9c40e0dbc2047c21b6156f)
+
+構造体に手を付けるに当たって、ローカル変数のオフセット割り当てで気になっていた煩雑なコードを
+`round_up`(切り上げ)関数を作って整理した。
+
+### [構造体型変数の定義](https://github.com/crhg/9ninecc/commit/c2aa2aa4378a325c99dabb265482414899f4f623)
+
+まず構造体型をTypeに追加。フィールドの型とオフセットの組をフィールド名でひけるMapをもつような感じにした。
+構造体の全体のサイズやalignmentも保持。
+
+オフセットの割り当てはとりあえず出てきた順に頭から、すぐ後に付けるとアラインメントが合わないときは隙間があく
+感じで実装したが、なにか規定がありそうな気がする?
+
+全体のアラインメントは要素のアラインメントの最大値。
+
+全体のサイズは最後のフィールドが収まるサイズを全体のアラインメントの倍数に切り上げ。
+
+### [->を実装](https://github.com/crhg/9ninecc/commit/a05bfa7c11355eba2ddea043af95be4d803ba920)
+
+`->`を先にしたのはどうせフィールドアクセスは構造体の先頭番地にフィールドのオフセット足してみたいな感じに
+なるので、構造体のポインタ起点になる`->`の方が楽そうだったから。
+
+あと構造体の`&`も変数の先頭番地を求めるだけなのでほぼコード書かなくて良さそうというのもある。
+
+さらに`x->y`はパース時にこっそり構文木が`*(&(x->y))`になるようにした。こうすると`x->y`に関するコード生成は
+左辺値のときだけですむので楽。
+
+### [TODO追加](https://github.com/crhg/9ninecc/commit/9ce3638db567b72d933914f0172f529625a9e506)
+
+### [.の実装](https://github.com/crhg/9ninecc/commit/3c4d1abc040c2ba977c90e811139ebc336f8d8ec)
+
+`x.y`をパース時に`*(&((&x)->y))`になるようにした。コード生成の追加がいらなくて楽。
+
+### [new_node_arrowがわかりにくい気がしたのでコメント追加](https://github.com/crhg/9ninecc/commit/37b06e799d30bef09f58e40e5cf0eeb0931799d8)
+
+忘れそうなのでコメントに書いておく。
+
+
+
+
