@@ -576,6 +576,7 @@ Type *type_spec() {
         type->fields = new_map();
         type->alignment = 1;
         type->size = 0;
+        type->incomplete = 0;
         type->next_offset = 0;
         
         while (!consume('}')) {
@@ -886,7 +887,16 @@ Type *direct_declarator_rest(Type *type) {
             error_at_here("']'でないトークンです(direct_declarator)");
         }
 
-        Type *array_type = array_of(direct_declarator_rest(type), len, incomplete_len);
+        Type *element_type = direct_declarator_rest(type);
+        if (element_type->ty == FUNC) {
+            error_at_token(token, "関数型の配列は作れません");
+        }
+        if (element_type->incomplete) {
+            warn_at_token(token, "未確定な型の配列は作れません");
+            error_at_token(element_type->token, "%s", typeToStr(element_type));
+        }
+
+        Type *array_type = array_of(element_type, len, incomplete_len);
         array_type->token = token;
         return array_type;
     }
@@ -951,7 +961,7 @@ Declarator *declarator(Type *type) {
 }
 
 void determine_array_size(Type *type, Initializer *init) {
-    if (!(type->ty == ARRAY && type->incomplete_len)) {
+    if (!(type->ty == ARRAY && type->incomplete)) {
         return;
     }
 
@@ -975,7 +985,7 @@ void determine_array_size(Type *type, Initializer *init) {
 
     type->len = len;
     type->size = len * type->ptrof->size;
-    type->incomplete_len = 0;
+    type->incomplete = 0;
 }
 
 Node *global_var_def(Declarator *decl, Initializer *init) {

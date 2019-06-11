@@ -65,10 +65,15 @@ typedef struct Type {
     int size;
     int alignment;
 
+    char incomplete; // 型が未確定であることを示すフラグ
+                     // 数値型やポインタ型は常に偽(確定している)
+                     // 配列: 長さが決まっていない, 構造体: 名前のみ決まっている
+                     // 関数型については意味が無い(多分)
+
     struct Type *ptrof; // PTRとARRAYのとき
 
     int len; // ARRAYのときの長さ(要素数)
-    char incomplete_len; // 配列の長さが未確定であることを示すフラグ
+
 
     struct Type *return_type; // FUNCのとき戻り値の型を示す
     Vector *params; // FUNCのときパラメタのベクター。要素はDeclarator
@@ -88,7 +93,7 @@ typedef struct Field {
 extern Type int_type;
 extern Type char_type;
 Type *pointer_of(Type *type);
-Type *array_of(Type *type, int len, int incomplete_size);
+Type *array_of(Type *type, int len, int incomplete);
 Type *function_of(Type *type, Vector *params);
 int type_eq(Type *x, Type *y);
 int get_size_of(Type *type);

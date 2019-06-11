@@ -2,8 +2,8 @@
 #include <stdlib.h>
 #include "9ninecc.h"
 
-Type char_type = { .ty = CHAR, .size = 1, .alignment = 1, };
-Type int_type = { .ty = INT, .size = 4, .alignment = 4, };
+Type char_type = { .ty = CHAR, .size = 1, .alignment = 1, .incomplete = 0, };
+Type int_type = { .ty = INT, .size = 4, .alignment = 4, .incomplete = 0, };
 
 // ポインタの型
 Type *pointer_of(Type *type) {
@@ -11,19 +11,20 @@ Type *pointer_of(Type *type) {
     ret->ty = PTR;
     ret->size = 8;
     ret->alignment = 8;
+    ret->incomplete = 0;
     ret->ptrof = type;
     return ret;
 }
 
 // 配列の型
-Type *array_of(Type *type, int len, int incomplete_size) {
+Type *array_of(Type *type, int len, int incomplete) {
     Type *ret = malloc(sizeof(Type));
     ret->ty = ARRAY;
     ret->ptrof = type;
     ret->len = len;
-    ret->incomplete_len = incomplete_size;
+    ret->incomplete = incomplete;
     ret->alignment = type->alignment;
-    ret->size = incomplete_size? 0: len * type->size;
+    ret->size = incomplete? 0: len * type->size;
     return ret;
 }
 
@@ -113,7 +114,11 @@ char *typeToStr(Type *type) {
         case PTR:
             return strprintf("ptr of %s", typeToStr(type->ptrof));
         case ARRAY:
-            return strprintf("array of %s", typeToStr(type->ptrof));
+            if (type->incomplete) {
+                return strprintf("array[] of %s", typeToStr(type->ptrof));
+            } else {
+                return strprintf("array[%d] of %s", type->len, typeToStr(type->ptrof));
+            }
         default:
             return tyToStr(type->ty);
     }

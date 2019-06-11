@@ -277,7 +277,7 @@ void gen_local_var_zero(int offset, int size) {
 }
 
 void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
-    if (type->incomplete_len) {
+    if (type->incomplete) {
         error_at_token(type->token, "配列のサイズが確定していません");
     }
 
