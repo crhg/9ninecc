@@ -713,3 +713,24 @@ int test99() {
     return a[9].x + a[9].y;
 }
 // @end
+
+// @try_out test100 "2,1,0,"
+int test100() {
+    struct a {
+        struct a *next;
+        int x;
+    } a[10];
+
+    a[0].next = 0;
+    a[0].x = 0;
+    a[1].next = &a[0];
+    a[1].x = 1;
+    a[2].next = &a[1];
+    a[2].x = 2;
+
+    struct a *p;
+    for (p = &a[2]; p != 0; p = p->next) {
+        try_printf("%d,", p->x);
+    }
+}
+// @end

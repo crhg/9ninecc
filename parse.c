@@ -36,6 +36,17 @@ int new_string(char *string) {
     return r;
 }
 
+// 構造体名のマップ。名前→型
+Map *struct_map;
+
+void register_struct(char *name, Type *type) {
+    map_put(struct_map, name, type);
+}
+
+Type *get_struct(char *name) {
+    return map_get(struct_map, name);
+}
+
 // 式の値が配列型だったらポインタ型に書き換える
 // 暗黙の配列からポインタへの型変換に使う
 Node *conv_a_to_p(Node *node) {
@@ -555,8 +566,13 @@ Node *ptr_ident(Type *type) {
 // 見つからなければnullを返す
 Declarator *declarator(Type *type);
 void add_field(Type *type, Declarator *decl);
+
+Type *make_incomplete_struct_type(Token *token);
+
 Type *type_spec() {
     Token *token;
+
+
     if (consume(TK_INT)) {
         return &int_type;
     }
@@ -566,19 +582,33 @@ Type *type_spec() {
     }
     
     if ((token = consume(TK_STRUCT))) {
-        if (!consume('{')) {
-            error_at_here("'{'がありません");
+        Type *type = NULL;
+        Token *id;
+
+        if ((id = consume(TK_IDENT))) {
+            type = get_struct(id->name);
+            if (type == NULL) {
+                type = make_incomplete_struct_type(token);
+                register_struct(id->name, type);
+            }
         }
-        
-        Type *type = malloc(sizeof(Type));
-        type->ty = STRUCT;
-        type->token = token;
-        type->fields = new_map();
-        type->alignment = 1;
-        type->size = 0;
-        type->incomplete = 0;
-        type->next_offset = 0;
-        
+
+        if (!consume('{')) {
+            if (type != NULL) {
+                return type;
+            }
+            error_at_here("'{'がありません"); // 名前がなければ {..} が必要
+        }
+
+        // 無名の場合
+        if (type == NULL) {
+            type = make_incomplete_struct_type(token);
+        }
+
+        if (!type->incomplete) {
+            error_at_token(id, "二重定義です");
+        }
+
         while (!consume('}')) {
             Type *field_type = type_spec();
             if (field_type == NULL) {
@@ -598,11 +628,26 @@ Type *type_spec() {
                 error_at_here("';'がありません");
             }
         }
+
+        type->incomplete = 0;
         
         return type;
     }
 
     return NULL;
+}
+
+// 空の不完全なstruct型を作る
+Type *make_incomplete_struct_type(Token *token) {
+    Type *type = malloc(sizeof(Type));
+    type->ty = STRUCT;
+    type->token = token;
+    type->fields = new_map();
+    type->alignment = 1;
+    type->size = 0;
+    type->incomplete = 1;
+    type->next_offset = 0;
+    return type;
 }
 
 // 構造体型にフィールドを追加します
@@ -1196,6 +1241,7 @@ Node *program() {
     Vector *top_levels = new_vector();
     global_var_map = new_map();
     strings = new_vector();
+    struct_map = new_map();
 
     while (TOKEN(pos)->ty != TK_EOF) {
         top_level(top_levels);
