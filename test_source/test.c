@@ -734,3 +734,28 @@ int test100() {
     }
 }
 // @end
+
+// @try_ret test101 101
+struct A101 {
+    int x;
+};
+int test101() {
+    struct A101 a101;
+    a101.x = 101;
+
+    return a101.x;
+}
+// @end
+
+// @try_ret test102 102
+int test102() {
+    struct A {
+        int x;
+    };
+
+    struct A a;
+    a.x = 102;
+
+    return a.x;
+}
+// @end

@@ -676,6 +676,11 @@ void determine_array_size(Type *type, Initializer *init);
 //-     <type_spec> <declarator> <declaration_rest>
 // <type_spec>は既に読まれた状態で呼ばれる。結果のtypeはパラメタでもらう
 Node *local_var_def(Type *type) {
+    Token *token;
+    if ((token = consume(';'))) {
+        return new_node(ND_EMPTY, token); // 定義する変数がない場合: 空文を返しておく
+    }
+
     Declarator *decl = declarator(type);
     Vector *vec = new_vector(); // (DeclInit *)のベクター
 
@@ -1218,6 +1223,11 @@ void top_level(Vector *top_levels) {
     type = type_spec();
     if (type == NULL) {
         error_at_here("intまたはcharでないトークンです(top_level)");
+    }
+
+    Token *token;
+    if (consume(';')) {
+        return;
     }
 
     decl = declarator(type);
