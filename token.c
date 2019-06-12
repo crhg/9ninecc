@@ -259,7 +259,7 @@ void tokenize() {
             continue;
         }
 
-        if ('a' <= *p && *p <= 'z') {
+        if (is_alpha(*p)) {
             Token *ident_token = push_token(TK_IDENT, p);
             ident_token->name = dup_name(p, &p);
             continue;

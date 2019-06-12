@@ -260,6 +260,7 @@ int new_local_var_offset(char *name);
 void gen(Node *node);
 
 // その他
+int is_alpha(char c);
 int is_alnum(char c);
 int round_up(int n, int m);
 int max(int n, int m);
