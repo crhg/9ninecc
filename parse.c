@@ -1225,7 +1225,6 @@ void top_level(Vector *top_levels) {
         error_at_here("intまたはcharでないトークンです(top_level)");
     }
 
-    Token *token;
     if (consume(';')) {
         return;
     }

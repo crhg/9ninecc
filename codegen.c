@@ -1077,7 +1077,6 @@ void gen(Node *node) {
         break;
     default:
         error("知らないノード種別: %d\n", node->ty);
-        break;
     }
 
     printf("  push rax\n");
