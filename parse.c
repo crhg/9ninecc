@@ -127,7 +127,7 @@ Node *new_node_add(Node *lhs, Node *rhs, Token *token) {
         error_at_token(token, "加算できない型の組み合わせです");
     }
 
-    Node *node = new_node_binop('+', lhs, rhs, token);
+    Node *node = new_node_binop(ND_ADD, lhs, rhs, token);
     node->type = lhs->type;
 
     return node;
@@ -184,9 +184,9 @@ Node *term() {
     Node *node;
     Token *token;
 
-    if (consume('(')) {
+    if (consume(TK_LPAR)) {
         Node *node_expr = expr();
-        if (!consume(')'))
+        if (!consume(TK_RPAR))
             error_at_here("開きカッコに対応する閉じカッコがありません");
         return node_expr;
     }
@@ -203,7 +203,7 @@ Node *term() {
     }
 
     if ((token = consume(TK_IDENT)) != NULL) {
-        if (!consume('(')) {
+        if (!consume(TK_LPAR)) {
             // ただの変数参照
             return new_node_var(token);
         } else {
@@ -214,17 +214,17 @@ Node *term() {
             node->type = &int_type;
             node->params = params;
 
-            if (consume(')')) {
+            if (consume(TK_RPAR)) {
                return node;
             }
 
             vec_push(params, expr());
 
-            while (consume(',')) {
+            while (consume(TK_COMMA)) {
                 vec_push(params, expr());
             }
 
-            if (!consume(')'))
+            if (!consume(TK_RPAR))
                 error_at_here("閉じカッコがありません");
 
             return node;
@@ -242,10 +242,10 @@ Node *array_term() {
 
     Token *token;
     for (;;) {
-        if ((token = consume('['))) {
+        if ((token = consume(TK_LBRACKET))) {
             Node *e = expr();
 
-            if (!consume(']')) {
+            if (!consume(TK_RBRACKET)) {
                 error_at(token->input, "']'がありません");
             }
 
@@ -270,7 +270,7 @@ Node *array_term() {
             continue;
         }
 
-        if ((token = consume('.'))) {
+        if ((token = consume(TK_DOT))) {
             assert_at_node(node, node->type != NULL, "型が不明です");
             if (!(node->type->ty == STRUCT)) {
                 error_at_token(token, "左辺がstructでない");
@@ -308,11 +308,11 @@ Node *new_node_arrow(Node *term, Token *field_name, Field *field, Token *token) 
 //- <pointer_term> = <array_term> | ('*' | '&') <pointer_term>
 Node *pointer_term() {
     Token *token;
-    if ((token = consume('*'))) {
+    if ((token = consume(TK_AST))) {
         return new_node_deref(pointer_term(), token);
     }
 
-    if ((token = consume('&'))) {
+    if ((token = consume(TK_AMP))) {
         Node *pt;
         pt = pointer_term();
         if (pt->type->ty == ARRAY) {
@@ -340,16 +340,16 @@ Node *unary() {
         return new_node_num(get_size_of(node_unary->type), token);
     }
 
-    if (consume('+'))
+    if (consume(TK_PLUS))
         return pointer_term();
 
-    if ((token = consume('-'))) {
+    if ((token = consume(TK_MINUS))) {
         Node *node_term = conv_a_to_p(pointer_term());
         if (node_term->type->ty == PTR) {
             error_at_node(node_term, "ポインターを負にすることはできません");
         }
 
-        Node *node = new_node_binop('-', new_node_num(0, token), node_term, token);
+        Node *node = new_node_binop(ND_SUB, new_node_num(0, token), node_term, token);
         node->type = &int_type;
         return node;
     }
@@ -363,7 +363,7 @@ Node *mul() {
     Node *rhs;
     Token *token;
     for (;;) {
-        if ((token = consume('*'))) {
+        if ((token = consume(TK_AST))) {
             node = conv_a_to_p(node);
             rhs = conv_a_to_p(unary());
             if (node->type->ty == PTR) {
@@ -373,9 +373,9 @@ Node *mul() {
                 error_at_node(rhs, "ポインタの掛け算はできません");
             }
 
-            node = new_node_binop('*', node, rhs, token);
+            node = new_node_binop(ND_MUL, node, rhs, token);
             node->type = &int_type;
-        } else if ((token = consume('/'))) {
+        } else if ((token = consume(TK_SLASH))) {
             node = conv_a_to_p(node);
             rhs = conv_a_to_p(unary());
             if (node->type->ty == PTR) {
@@ -384,7 +384,7 @@ Node *mul() {
             if (rhs->type->ty == PTR) {
                 error_at_node(rhs, "ポインタの割り算はできません");
             }
-            node = new_node_binop('/', node, rhs, token);
+            node = new_node_binop(ND_DIV, node, rhs, token);
             node->type = &int_type;
         } else {
             return node;
@@ -400,14 +400,14 @@ Node *add() {
     Node *lhs;
     Node *rhs;
     for (;;) {
-        if ((token = consume('+'))) {
+        if ((token = consume(TK_PLUS))) {
             lhs = node;
             rhs = mul();
             node = new_node_add(lhs, rhs, token);
-        } else if ((token = consume('-'))) {
+        } else if ((token = consume(TK_MINUS))) {
             lhs = conv_a_to_p(node);
             rhs = conv_a_to_p(mul());
-            node = new_node_binop('-', lhs, rhs, token);
+            node = new_node_binop(ND_SUB, lhs, rhs, token);
 
             // XXX: INTとPTRしかないのでこの判定
             if (lhs->type->ty == PTR && type_eq(lhs->type, rhs->type)) {
@@ -429,14 +429,14 @@ Node *relational() {
 
     Token *token;
     for (;;) {
-        if ((token = consume('<'))) {
-            node = new_node_binop('<', conv_a_to_p(node), conv_a_to_p(add()), token);
+        if ((token = consume(TK_LT))) {
+            node = new_node_binop(ND_LT, conv_a_to_p(node), conv_a_to_p(add()), token);
             node->type = &int_type;
         } else if ((token = consume(TK_LE))) {
             node = new_node_binop(ND_LE, conv_a_to_p(node), conv_a_to_p(add()), token);
             node->type = &int_type;
-        } else if ((token =consume('>'))) {
-            node = new_node_binop('<', conv_a_to_p(add()), conv_a_to_p(node), token);
+        } else if ((token =consume(TK_GT))) {
+            node = new_node_binop(ND_LT, conv_a_to_p(add()), conv_a_to_p(node), token);
             node->type = &int_type;
         } else if ((token =consume(TK_GE))) {
             node = new_node_binop(ND_LE, conv_a_to_p(add()), conv_a_to_p(node), token);
@@ -472,12 +472,12 @@ Node *assign() {
     Type *type = node->type;
 
     Token *token;
-    if ((token = consume('='))) {
+    if ((token = consume(TK_ASSIGN))) {
         if (!is_lvalue(node)) {
             error_at_node(node, "lvalueでありません");
         }
 
-        node = new_node_binop('=', node, conv_a_to_p(assign()), token);
+        node = new_node_binop(ND_ASSIGN, node, conv_a_to_p(assign()), token);
         // XXX: 代入式の型は左辺の型にしといたけど要確認
         node->type = type;
     }
@@ -495,7 +495,7 @@ Node *stmt();
 
 //- <block> ::= '{' <stmt>* '}'
 Node *block() {
-    if (!consume('{')) {
+    if (!consume(TK_LBRACE)) {
         error_at_here("'{'でないトークンです2");
     }
 
@@ -503,7 +503,7 @@ Node *block() {
     Vector *stmts = new_vector();
     node->stmts = stmts;
 
-    while (!consume('}')) {
+    while (!consume(TK_RBRACE)) {
         vec_push(stmts, stmt());
     }
 
@@ -515,13 +515,13 @@ int eval_constant_expr(Node *node) {
     switch (node->ty) {
         case ND_NUM:
             return node->val;
-        case '+':
+        case ND_ADD:
             return eval_constant_expr(node->lhs) + eval_constant_expr(node->rhs);
-        case '-':
+        case ND_SUB:
             return eval_constant_expr(node->lhs) - eval_constant_expr(node->rhs);
-        case '*':
+        case ND_MUL:
             return eval_constant_expr(node->lhs) * eval_constant_expr(node->rhs);
-        case '/':
+        case ND_DIV:
             return eval_constant_expr(node->lhs) / eval_constant_expr(node->rhs);
         // TODO: 演算子のバリエーション
         default:
@@ -534,7 +534,7 @@ Node *ptr_ident(Type *type) {
     Node *node;
 
     Token *token;
-    if ((token = consume('*'))) {
+    if ((token = consume(TK_AST))) {
         node = new_node(ND_DEREF, token);
         node->ptrto = ptr_ident(pointer_of(type));
         node->type = type;
@@ -543,9 +543,9 @@ Node *ptr_ident(Type *type) {
 
     Token *id;
     if ((id = consume(TK_IDENT)) != NULL) {
-        if (consume('[')) {
+        if (consume(TK_LBRACKET)) {
             Node *len_expr = expr();
-            if (!consume(']')) {
+            if (!consume(TK_RBRACKET)) {
                 error_at_here("']'でないトークンです");
             }
 
@@ -593,7 +593,7 @@ Type *type_spec() {
             }
         }
 
-        if (!consume('{')) {
+        if (!consume(TK_LBRACE)) {
             if (type != NULL) {
                 return type;
             }
@@ -609,7 +609,7 @@ Type *type_spec() {
             error_at_token(id, "二重定義です");
         }
 
-        while (!consume('}')) {
+        while (!consume(TK_RBRACE)) {
             Type *field_type = type_spec();
             if (field_type == NULL) {
                 error_at_here("フィールドの型がありません");
@@ -619,12 +619,12 @@ Type *type_spec() {
             decl = declarator(field_type);
             add_field(type, decl);
             
-            while (consume(',')) {
+            while (consume(TK_COMMA)) {
                 decl = declarator(field_type);
                 add_field(type, decl);
             }
             
-            if (!consume(';')) {
+            if (!consume(TK_SEMI)) {
                 error_at_here("';'がありません");
             }
         }
@@ -677,7 +677,7 @@ void determine_array_size(Type *type, Initializer *init);
 // <type_spec>は既に読まれた状態で呼ばれる。結果のtypeはパラメタでもらう
 Node *local_var_def(Type *type) {
     Token *token;
-    if ((token = consume(';'))) {
+    if ((token = consume(TK_SEMI))) {
         return new_node(ND_EMPTY, token); // 定義する変数がない場合: 空文を返しておく
     }
 
@@ -718,12 +718,12 @@ Node *stmt() {
     if (consume(TK_IF)) {
         node = new_node(ND_IF, NULL);
 
-        if (!consume('('))
+        if (!consume(TK_LPAR))
             error_at_here("'('ではないトークンです");
 
         node->cond = expr();
 
-        if (!consume(')'))
+        if (!consume(TK_RPAR))
             error_at_here("')'ではないトークンです");
 
         node->stmt = stmt();
@@ -740,12 +740,12 @@ Node *stmt() {
     if (consume(TK_WHILE)) {
         node = new_node(ND_WHILE, NULL);
 
-        if (!consume('('))
+        if (!consume(TK_LPAR))
             error_at_here("'('ではないトークンです");
 
         node->cond = expr();
 
-        if (!consume(')'))
+        if (!consume(TK_RPAR))
             error_at_here("')'ではないトークンです");
 
         node->stmt = stmt();
@@ -756,30 +756,30 @@ Node *stmt() {
     if (consume(TK_FOR)) {
         node = new_node(ND_FOR, NULL);
 
-        if (!consume('('))
+        if (!consume(TK_LPAR))
             error_at_here("'('ではないトークンです");
 
-        if (consume(';')) {
+        if (consume(TK_SEMI)) {
             node->init = NULL;
         } else {
             node->init = expr();
-            if (!consume(';'))
+            if (!consume(TK_SEMI))
                 error_at_here("';'ではないトークンです");
         }
 
-        if (consume(';')) {
+        if (consume(TK_SEMI)) {
             node->cond = NULL;
         } else {
             node->cond = expr();
-            if (!consume(';'))
+            if (!consume(TK_SEMI))
                 error_at_here("';'ではないトークンです");
         }
 
-        if (consume(')')) {
+        if (consume(TK_RPAR)) {
             node->next = NULL;
         } else {
             node->next = expr();
-            if (!consume(')'))
+            if (!consume(TK_RPAR))
                 error_at_here("')'ではないトークンです");
         }
 
@@ -794,25 +794,25 @@ Node *stmt() {
         return node;
     }
 
-    if (next_token_is('{')) {
+    if (next_token_is(TK_LBRACE)) {
         return block();
     }
 
     if (consume(TK_RETURN)) {
         node = new_node_binop(ND_RETURN, expr(), NULL, NULL);
-        if (!consume(';'))
+        if (!consume(TK_SEMI))
             error_at_here("';'ではないトークンです");
         return node;
     }
 
     Token *token;
-    if ((token = consume(';'))) {
+    if ((token = consume(TK_SEMI))) {
         return new_node(ND_EMPTY, token);
     }
 
     // 残りは <expr> ';'のみ
     node = new_node_binop(ND_EXPR, expr(), NULL, NULL);
-    if (!consume(';'))
+    if (!consume(TK_SEMI))
         error_at_here("';'ではないトークンです");
     return node;
 }
@@ -922,9 +922,9 @@ Declarator *param_decl() {
 Type *direct_declarator_rest(Type *type) {
     Token *token;
     char incomplete_len;
-    if ((token = consume('['))) {
+    if ((token = consume(TK_LBRACKET))) {
         size_t len;
-        if (next_token_is(']')) {
+        if (next_token_is(TK_RBRACKET)) {
             len = 0;
             incomplete_len = 1;
         } else {
@@ -933,7 +933,7 @@ Type *direct_declarator_rest(Type *type) {
             incomplete_len = 0;
         }
 
-        if (!consume(']')) {
+        if (!consume(TK_RBRACKET)) {
             error_at_here("']'でないトークンです(direct_declarator)");
         }
 
@@ -951,19 +951,19 @@ Type *direct_declarator_rest(Type *type) {
         return array_type;
     }
 
-    if ((token = consume('('))) {
+    if ((token = consume(TK_LPAR))) {
         // TODO: パラメタリストは型を書かずidだけの古い形式もあるが対応していない
         // TODO: ...には対応していない
         // TODO: 関数型の定義だけなら仮引数名は省略できるが対応していない
         Vector *params = new_vector();
-        if (!next_token_is(')')) {
+        if (!next_token_is(TK_RPAR)) {
             vec_push(params, param_decl());
-            while (consume(',')) {
+            while (consume(TK_COMMA)) {
                 vec_push(params, param_decl());
             }
         }
 
-        if (!consume(')')) {
+        if (!consume(TK_RPAR)) {
             error_at_here("')'でないトークンです(direct_declarator)");
         }
 
@@ -981,10 +981,10 @@ Declarator *direct_declarator(Type *type) {
     Token *id;
     Declarator *decl;
 
-    if (consume('(')) {
+    if (consume(TK_LPAR)) {
         decl = declarator(NULL);
-        if (!consume(')')) {
-            error_at_here("'('でないトークンです(direct_declarator)");
+        if (!consume(TK_RPAR)) {
+            error_at_here("')'でないトークンです(direct_declarator)");
         }
     } else if ((id = consume(TK_IDENT)) != NULL) {
         decl = malloc(sizeof(Declarator));
@@ -1001,7 +1001,7 @@ Declarator *direct_declarator(Type *type) {
 //- <declarator> ::= '*' <declarator> | <direct_declarator>
 Declarator *declarator(Type *type) {
     Token *token;
-    if ((token = consume('*'))) {
+    if ((token = consume(TK_AST))) {
         Declarator *decl = declarator(pointer_of(type));
         type->token = token;
         return decl;
@@ -1154,21 +1154,21 @@ Initializer *initializer() {
 
     ret = malloc(sizeof(Initializer));
 
-    if (consume('{')) {
+    if (consume(TK_LBRACE)) {
         ret->ty = INITIALIZER_TYPE_LIST;
         Vector *list = new_vector();
         for (;;) {
-            if (consume('}')) {
+            if (consume(TK_RBRACE)) {
                 break;
             }
 
             vec_push(list, initializer());
 
-            if (consume('}')) {
+            if (consume(TK_RBRACE)) {
                 break;
             }
 
-            if (!consume(',')) {
+            if (!consume(TK_COMMA)) {
                 error_at_here("','でも'}'でもないトークンです");
             }
         }
@@ -1194,18 +1194,18 @@ DeclInit *decl_init(Declarator *decl, Initializer *init) {
 //-     ('=' <initializer>)? ( ';'| ',' <declarator> <declaration_rest>)
 // vecに結果を追加していく。
 void declaration_rest(Type *type, Declarator *decl, Vector *vec) {
-    if (consume('=')) {
+    if (consume(TK_ASSIGN)) {
         Initializer *init = initializer();
         vec_push(vec, decl_init(decl, init));
     } else {
         vec_push(vec, decl_init(decl, NULL));
     }
 
-    if (consume(';')) {
+    if (consume(TK_SEMI)) {
         return;
     }
 
-    if (!consume(',')) {
+    if (!consume(TK_COMMA)) {
         error_at_here("','でも';'でもないトークンです");
     }
 
@@ -1225,13 +1225,13 @@ void top_level(Vector *top_levels) {
         error_at_here("intまたはcharでないトークンです(top_level)");
     }
 
-    if (consume(';')) {
+    if (consume(TK_SEMI)) {
         return;
     }
 
     decl = declarator(type);
 
-    if (next_token_is('{')) {
+    if (next_token_is(TK_LBRACE)) {
         vec_push(top_levels, function_definition(decl));
         return;
     }

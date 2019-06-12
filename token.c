@@ -65,6 +65,14 @@ Token *push_token(int ty, char *input) {
     return token;
 }
 
+//typedef struct PunctToToken {
+//    char *punct;
+//    TokenId tk;
+//} PunctToToken;
+//static PunctToToken punct_to_token[] = {
+//        {.punct = "["}
+//};
+
 // ポインタの指すところにキーワードがあるか。
 // *np にキーワードの次の文字のポインタを返す
 int keyword(char *p, char **np, char *name) {
@@ -76,7 +84,6 @@ int keyword(char *p, char **np, char *name) {
     
     return 0;
 }
-
 
 
 

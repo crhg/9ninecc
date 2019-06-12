@@ -21,11 +21,37 @@ void map_put(Map *map, char *key, void *val);
 void *map_get(Map *map, char *key);
 
 // トークンの型を表す値
-enum {
-    TK_NUM = 256, // 整数トークン
-    TK_IDENT,     // 識別子
-    TK_EOF,       // 入力の終わり
-    TK_RETURN,    // return
+typedef enum TokenId {
+    // 1文字記号は値を文字コードで合わせる
+    TK_AMP = '&',
+    TK_LPAR = '(',
+    TK_RPAR = ')',
+    TK_AST = '*',
+    TK_PLUS = '+',
+    TK_COMMA = ',',
+    TK_MINUS = '-',
+    TK_DOT = '.',
+    TK_SLASH = '/',
+    TK_SEMI = ';',
+    TK_LT = '<',
+    TK_ASSIGN = '=',
+    TK_GT = '>',
+    TK_LBRACKET = '[',
+    TK_RBRACKET = ']',
+    TK_LBRACE = '{',
+    TK_RBRACE = '}',
+
+    TK_EOF = 256,       // 入力の終わり
+
+    // 2文字記号
+    TK_NE, // !=
+    TK_ARROW, // ->
+    TK_LE, // <=
+    TK_EQ, // ==
+    TK_GE, // >=
+
+    // 予約語
+    TK_RETURN,
     TK_IF,
     TK_ELSE,
     TK_WHILE,
@@ -34,17 +60,16 @@ enum {
     TK_INT,
     TK_SIZEOF,
     TK_STRUCT,
-    TK_EQ,        // ==
-    TK_NE,        // !=
-    TK_LE,        // <=
-    TK_GE,        // >=
+
+    // それ以外
+    TK_NUM,       // 整数トークン
+    TK_IDENT,     // 識別子
     TK_STRING,    // 文字列リテラル
-    TK_ARROW,     // ->
-};
+} TokenId;
 
 // トークンの型
 typedef struct {
-    int ty;      // トークンの型
+    TokenId ty;      // トークンの型
     int val;     // tyがTK_NUMの場合、その数値
     char *name;  // tyがTK_IDENTの場合、その名前
     char *str;   // tyがTK_STRINGの場合、その文字列
@@ -109,29 +134,44 @@ typedef struct LocalVar {
 
 // ノードの型を表す値
 typedef enum NodeType {
-    ND_NUM = 256, // 整数のノードの型
-    ND_IDENT,     // 識別子
+    ND_ADD = '+',
+    ND_SUB = '-',
+    ND_MUL = '*',
+    ND_DIV = '/',
+    ND_LT = '<',
+    ND_ASSIGN = '=',
+
+    // 式
+    ND_NUM = 256,   // 整数
+
+    ND_IDENT,       // 識別子
     ND_LOCAL_VAR,
     ND_GLOBAL_VAR,
-    ND_DEREF,
-    ND_GET_PTR,
-    ND_RETURN,    // return
+
+    ND_CALL,        // 関数呼び出し
+    ND_EQ,          // ==
+    ND_NE,          // !=
+    ND_LE,          // <=
+    ND_STRING,      // 文字列リテラル
+
+    ND_ARROW,       // ->
+
+    ND_DEREF,       // *x
+    ND_GET_PTR,     // &x
+
+    // 文
+    ND_EMPTY,       // 空文: ;
+    ND_RETURN,      // return
     ND_IF,
     ND_WHILE,
     ND_FOR,
-    ND_EXPR,      // <式>; 文
+    ND_EXPR,        // 式文: <式>;
     ND_BLOCK,
-    ND_CALL,      // 関数呼び出し
-    ND_FUNC,      // 関数定義
+
+    ND_FUNC,        // 関数定義
     ND_LOCAL_VAR_DEF,
     ND_GLOBAL_VAR_DEF,
     ND_PROGRAM,
-    ND_EQ,        // ==
-    ND_NE,        // !=
-    ND_LE,        // <=
-    ND_STRING,    // 文字列リテラル
-    ND_EMPTY,     // 空文
-    ND_ARROW,     // ->
 } NodeType;
 
 

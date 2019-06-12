@@ -459,7 +459,7 @@ GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
     GlobalScalarInitValue *lhs = eval_global_initializer_scalar(node->lhs);
     GlobalScalarInitValue *rhs = eval_global_initializer_scalar(node->rhs);
 
-    if (node->ty == '+') {
+    if (node->ty == ND_ADD) {
         if (node->lhs->type->ty == PTR) {
             lhs->val += rhs->val * get_size_of(node->lhs->type->ptrof);
             return lhs;
@@ -468,7 +468,7 @@ GlobalScalarInitValue *eval_global_initializer_scalar(Node *node) {
         return lhs;
     }
 
-    if (node->ty == '-') {
+    if (node->ty == ND_SUB) {
         if (node->type->ty == PTR) {
             if (node->rhs->type->ty == PTR) {
                 error_at_node(node, "初期化式でポインタ同士の減算はできません");
@@ -702,7 +702,7 @@ void gen(Node *node) {
         return;
     }
 
-    if (node->ty == '=') {
+    if (node->ty == ND_ASSIGN) {
         print_comment_start("代入");
 
         // 代入
@@ -942,7 +942,7 @@ void gen(Node *node) {
         return;
     }
 
-    if (node->ty == '+') {
+    if (node->ty == ND_ADD) {
         print_comment_start("+ type=%s", typeToStr(node->type));
         assert_at_node(node, node->lhs->type != NULL, "lhs type is null");
 
@@ -974,7 +974,7 @@ void gen(Node *node) {
         return;
     }
 
-    if (node->ty == '-') {
+    if (node->ty == ND_SUB) {
         print_comment_start("-");
         assert_at_node(node, node->lhs->type != NULL, "lhs type is null");
         assert_at_node(node, node->rhs->type != NULL, "rhs type is null");
@@ -1041,11 +1041,11 @@ void gen(Node *node) {
     stack_pop(8, node->lhs);
 
     switch (node->ty) {
-    case '*':
+    case ND_MUL:
         print_comment("*");
         printf("  imul rdi\n");
         break;
-    case '/':
+    case ND_DIV:
         print_comment("/");
         printf("  cqo\n");
         printf("  idiv rdi\n");
@@ -1062,7 +1062,7 @@ void gen(Node *node) {
         printf("  setne al\n");
         printf("  movzb rax, al\n");
         break;
-    case '<':
+    case ND_LT:
         print_comment("<");
         printf("  cmp rax, rdi\n");
         printf("  setl al\n");
