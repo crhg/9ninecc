@@ -86,13 +86,12 @@ void assert_stack_empty(Node *node) {
 }
 
 // スタック調整
-// 関数呼び出し前にスタックが16バイト境界になるように調整する
-// callが戻り番地を8バイト積むのでその分も考慮
+// 関数呼び出し前(call命令実行時)にスタックが16バイト境界になるように調整する
 // 調整量を返す
 // param_stack_sizeはスタック渡しするパラメタのサイズ合計
 int adjust_stack(int param_stack_size) {
     int adjust;
-    adjust = 16 - (stack_ptr + param_stack_size + 8) % 16;
+    adjust = 16 - (stack_ptr + param_stack_size) % 16;
     if (adjust % 16 == 0) adjust = 0;
     if (adjust != 0) {
         printf("  sub rsp, %d\n", adjust);
