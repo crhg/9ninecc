@@ -688,7 +688,7 @@ void add_field(Type *type, Declarator *decl) {
 }
 
 void declaration_rest(Type *type, Declarator *decl, Vector *vec);
-void determine_array_size(Type *type, Initializer *init);
+void determine_array_size(Declarator *decl, Initializer *init);
 
 //- <local_var_def> ::=
 //-     <type_spec> <declarator> <declaration_rest>
@@ -708,7 +708,7 @@ Node *local_var_def(Type *type) {
     for (int i = 0; i < vec->len; i++) {
         DeclInit *decl_init = (DeclInit *) vec->data[i];
         Declarator *d = decl_init->decl;
-        determine_array_size(d->type, decl_init->init);
+        determine_array_size(d, decl_init->init);
         vec_push(local_vars, new_local_var(d->id->name, d->type));
     }
 
@@ -1026,9 +1026,17 @@ Declarator *declarator(Type *type) {
     return direct_declarator(type);
 }
 
-void determine_array_size(Type *type, Initializer *init) {
+// もし配列型で長さが未確定の時にinitializerで確定できれば確定させます。
+// 確定できなければエラーです。
+void determine_array_size(Declarator *decl, Initializer *init) {
+    Type *type = decl->type;
+
     if (!(type->ty == ARRAY && type->incomplete)) {
         return;
+    }
+    
+    if (init == NULL) {
+        error_at_token(decl->id, "初期値がないので配列の長さを確定できません");
     }
 
     int len;
@@ -1042,11 +1050,11 @@ void determine_array_size(Type *type, Initializer *init) {
         case INITIALIZER_TYPE_LIST:
             len = init->list->len;
             if (len == 0) {
-                error_at_token(type->token, "配列サイズが省略されているのに初期値リストが空");
+                error_at_token(decl->id, "配列サイズが省略されているのに初期値リストが空");
             }
             break;
         default:
-            error_at_token(type->token, "予期しないinitializer type: %d", init->ty);
+            error_at_token(decl->id, "予期しないinitializer type: %d", init->ty);
     }
 
     type->len = len;
@@ -1065,7 +1073,7 @@ Node *global_var_def(Declarator *decl, Initializer *init) {
     node->type = decl->type;
     node->initializer = init;
 
-    determine_array_size(decl->type, init);
+    determine_array_size(decl, init);
 
     return node;
 }
@@ -1164,39 +1172,161 @@ Node *function_definition(Declarator *decl) {
 
 //- <initializer> ::=
 //-     <expr>
-//-   | '{' (<initializer> (',' <initializer>)* ','? '}'
-Initializer *initializer() {
-    Initializer *ret;
+//-   | '{' (<designation>? <initializer> (',' <designation>? <initializer>)* ','? '}'
+// 当面structとunionは.field形式の<designation>必須とする
+Initializer *struct_initializer(Type *type);
+Initializer *union_initializer(Type *type);
+Initializer *array_initializer(Type *type);
 
-    ret = malloc(sizeof(Initializer));
+Initializer *initializer(Type *type) {
+    Token *token;
 
-    if (consume(TK_LBRACE)) {
-        ret->ty = INITIALIZER_TYPE_LIST;
-        Vector *list = new_vector();
-        for (;;) {
-            if (consume(TK_RBRACE)) {
-                break;
-            }
-
-            vec_push(list, initializer());
-
-            if (consume(TK_RBRACE)) {
-                break;
-            }
-
-            if (!consume(TK_COMMA)) {
-                error_at_here("','でも'}'でもないトークンです");
-            }
+    if ((token = consume(TK_LBRACE))) {
+        switch (type->ty) {
+            case ARRAY:
+                return array_initializer(type);
+            case STRUCT:
+                return struct_initializer(type);
+            case UNION:
+                return union_initializer(type);
+            default:
+                error_at_token(token, "リスト形式で初期化できない型です");
         }
-        ret->list = list;
+    }
+
+    Initializer *ret = malloc(sizeof(Initializer));
+    ret->ty = INITIALIZER_TYPE_EXPR;
+    ret->expr = expr();
+
+    if (is_scalar_type(type)) {
         return ret;
     }
 
-    ret->ty = INITIALIZER_TYPE_EXPR;
-    ret->expr = expr();
+    if (type->ty == ARRAY && type->ptrof->ty == CHAR && ret->expr->ty == ND_STRING) {
+        return ret;
+    }
+
+    error_at_node(ret->expr, "式では初期化できない型です");
+}
+
+// TODO: [ <constant-expression> ] = 形式の<designation>対応
+Initializer *array_initializer(Type *type) {
+    Initializer *ret = malloc(sizeof(Initializer));
+
+    ret->ty = INITIALIZER_TYPE_LIST;
+    Vector *list = new_vector();
+
+    for (;;) {
+        if (consume(TK_RBRACE)) {
+            break;
+        }
+
+        vec_push(list, initializer(type->ptrof));
+
+        if (consume(TK_RBRACE)) {
+            break;
+        }
+
+        if (!consume(TK_COMMA)) {
+            error_at_here("','でも'}'でもないトークンです");
+        }
+    }
+    ret->list = list;
     return ret;
 }
 
+Initializer *struct_initializer(Type *type) {
+    Initializer *ret = malloc(sizeof(Initializer));
+
+    ret->ty = INITIALIZER_TYPE_MAP;
+    Map *map = new_map(); // フィールド名→Initializer
+    ret->map = map;
+
+    for (;;) {
+        if (consume(TK_RBRACE)) {
+            break;
+        }
+
+        if (!consume(TK_DOT)) {
+            error_at_here("'.'がありません(フィールド名なしの構造体の初期化は未実装)");
+        }
+
+        Token *identifier;
+        if (!(identifier = consume(TK_IDENT))) {
+            error_at_here("フィールドの識別子がありません");
+        }
+
+
+        if (!consume(TK_ASSIGN)) {
+            error_at_here("'='がありません");
+        }
+
+        if (map_get(map, identifier->name)) {
+            error_at_token(identifier, "二重の初期化です");
+        }
+
+        Field *field = map_get(type->fields, identifier->name);
+
+        if (field == NULL) {
+            error_at_token(identifier, "存在しないフィールド名です");
+        }
+
+        map_put(map,identifier->name, initializer(field->type));
+
+        if (consume(TK_RBRACE)) {
+            break;
+        }
+
+        if (!consume(TK_COMMA)) {
+            error_at_here("','でも'}'でもないトークンです");
+        }
+    }
+
+    return ret;
+}
+
+Initializer *union_initializer(Type *type) {
+    Initializer *ret = malloc(sizeof(Initializer));
+
+    ret->ty = INITIALIZER_TYPE_MAP;
+    Map *map = new_map(); // フィールド名→Initializer
+    ret->map = map;
+
+
+    if (consume(TK_RBRACE)) {
+        return ret;
+    }
+
+    if (!consume(TK_DOT)) {
+        error_at_here("'.'がありません(フィールド名なしの共用体の初期化は未実装)");
+    }
+
+    Token *identifier;
+    if (!(identifier = consume(TK_IDENT))) {
+        error_at_here("フィールドの識別子がありません");
+    }
+
+    if (!consume(TK_ASSIGN)) {
+        error_at_here("'='がありません");
+    }
+
+    Field *field = map_get(type->fields, identifier->name);
+
+    if (field == NULL) {
+        error_at_token(identifier, "存在しないフィールド名です");
+    }
+
+    map_put(map, identifier->name, initializer(field->type));
+
+    consume(TK_COMMA);
+
+    if (!consume(TK_RBRACE)) {
+        error_at_here("'}'でないトークンです");
+
+    }
+
+    return ret;
+}
 
 DeclInit *decl_init(Declarator *decl, Initializer *init) {
     DeclInit *ret = malloc(sizeof(DeclInit));
@@ -1211,7 +1341,7 @@ DeclInit *decl_init(Declarator *decl, Initializer *init) {
 // vecに結果を追加していく。
 void declaration_rest(Type *type, Declarator *decl, Vector *vec) {
     if (consume(TK_ASSIGN)) {
-        Initializer *init = initializer();
+        Initializer *init = initializer(decl->type);
         vec_push(vec, decl_init(decl, init));
     } else {
         vec_push(vec, decl_init(decl, NULL));
@@ -1253,7 +1383,7 @@ void top_level(Vector *top_levels) {
     }
 
     Vector *decl_inits = new_vector();
-    declaration_rest(type, decl, decl_inits);
+    declaration_rest(decl->type, decl, decl_inits);
     for (int i = 0; i < decl_inits->len; i++) {
         DeclInit *decl_init = (DeclInit *)decl_inits->data[i];
         vec_push(top_levels, init_declarator_global(decl_init->decl, decl_init->init));

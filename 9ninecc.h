@@ -122,6 +122,7 @@ Type *pointer_of(Type *type);
 Type *array_of(Type *type, int len, int incomplete);
 Type *function_of(Type *type, Vector *params);
 int type_eq(Type *x, Type *y);
+int is_scalar_type(Type *type);
 int get_size_of(Type *type);
 int get_alignment(Type *type);
 char *tyToStr(TypeId ty);
@@ -220,12 +221,14 @@ typedef struct Declarator {
 typedef enum InitializerType {
     INITIALIZER_TYPE_EXPR,
     INITIALIZER_TYPE_LIST,
+    INITIALIZER_TYPE_MAP,
 } InitializerType;
 
 typedef struct Initializer {
     InitializerType ty;
     Node *expr;
     Vector *list;
+    Map *map; // フィールド名→Initializer
 } Initializer;
 
 typedef struct DeclInit {

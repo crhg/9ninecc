@@ -320,11 +320,39 @@ void gen_local_var_array_init(Type *type, int offset, Initializer *init) {
     }
 }
 
+void gen_local_var_struct_init(Type *type, int offset, Initializer *init) {
+    for (int i = 0; i < type->fields->keys->len; i++) {
+        char *name = type->fields->keys->data[i];
+        Field *field = type->fields->vals->data[i];
+        Initializer *i = map_get(init->map, name);
+        if (i != NULL) {
+            gen_local_var_init(field->type, offset - field->offset, i);
+        } else {
+            gen_local_var_zero(offset - field->offset, field->type->size);
+        }
+    }
+}
+
+void gen_local_var_union_init(Type *type, int offset, Initializer *init) {
+    char *name = init->map->keys->data[0];
+    Initializer *i = init->map->vals->data[0];
+    Field *field = map_get(type->fields, name);
+    gen_local_var_init(field->type, offset, i);
+}
+
 void gen_local_var_init(Type *type, int offset, Initializer *init) {
-    if (type->ty == ARRAY) {
-        gen_local_var_array_init(type, offset, init);
-    } else {
-        gen_local_var_scalar_init(type, offset, init->expr);
+    switch (type->ty) {
+        case ARRAY:
+            gen_local_var_array_init(type, offset, init);
+            break;
+        case STRUCT:
+            gen_local_var_struct_init(type, offset, init);
+            break;
+        case UNION:
+            gen_local_var_union_init(type, offset, init);
+            break;
+        default:
+            gen_local_var_scalar_init(type, offset, init->expr);
     }
 }
 
@@ -595,14 +623,11 @@ void gen(Node *node) {
     }
 
     if (node->ty == ND_LOCAL_VAR_DEF) {
-        // 変数定義
-        // 今のところ何もしない
         gen_local_var_def(node);
         return;
     }
 
     if (node->ty == ND_GLOBAL_VAR_DEF) {
-        // グローバル変数定義
         gen_global_var_def(node);
         return;
     }

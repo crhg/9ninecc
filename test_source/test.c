@@ -805,3 +805,29 @@ int test105() {
     try_printf("%s", u.y);
 }
 // @end
+
+// @try_out test106 106hoge
+int test106() {
+    struct S106 {
+        int x;
+        char y[20];
+    };
+
+    struct S106 s = { .x = 106, .y = "hoge" };
+
+    try_printf("%d%s", s.x, s.y);
+}
+// @end
+
+// @try_ret test107 107
+int test107() {
+    union U107 {
+        int x;
+        char y[5];
+    };
+
+    union U107 u = { .x = 107 };
+
+    return u.x;
+}
+// @end

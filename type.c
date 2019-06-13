@@ -55,6 +55,18 @@ int type_eq(Type *x, Type *y) {
     return 1;
 }
 
+// スカラー型かしらべる(数値orポインタ)
+int is_scalar_type(Type *type) {
+    switch (type->ty) {
+        case INT:
+        case CHAR:
+        case PTR:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 // 型のバイト数
 int get_size_of(Type *type) {
     switch (type->ty) {
