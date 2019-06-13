@@ -759,3 +759,49 @@ int test102() {
     return a.x;
 }
 // @end
+
+// @trey_ret test103 103
+int test103() {
+    union U103 {
+        int x;
+        char y[10];
+    };
+
+    union U103 u;
+
+    u.y[0] = 33;
+
+    return u.y[0];
+}
+// @end
+
+// @trey_out test104 !
+int test104() {
+    union U104 {
+        int x;
+        char y[10];
+    };
+
+    union U104 u;
+
+    u.y[0] = 33;
+    u.y[1] = 0;
+
+    try_printf("%s", u.y);
+}
+// @end
+
+// @trey_out test105 !A
+int test105() {
+    union U105 {
+        int x;
+        char y[10];
+    };
+
+    union U105 u;
+
+    u.x = 33 + 65 * 256; // 33 = !, 65 = A
+
+    try_printf("%s", u.y);
+}
+// @end

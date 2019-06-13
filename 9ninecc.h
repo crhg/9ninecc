@@ -60,6 +60,7 @@ typedef enum TokenId {
     TK_INT,
     TK_SIZEOF,
     TK_STRUCT,
+    TK_UNION,
 
     // それ以外
     TK_NUM,       // 整数トークン
@@ -83,7 +84,7 @@ typedef enum IdType {
 } IdType;
 
 // 型
-typedef enum TypeId {CHAR, INT, PTR, ARRAY, FUNC, STRUCT} TypeId;
+typedef enum TypeId {CHAR, INT, PTR, ARRAY, FUNC, STRUCT, UNION} TypeId;
 typedef struct Type {
     TypeId ty;
 
@@ -179,7 +180,7 @@ struct Initializer;
 
 // ノードの型
 typedef struct Node {
-    int ty;
+    NodeType ty;
     Token *token;      // 位置表示のためのトークン
     struct Node *lhs;
     struct Node *rhs;
@@ -295,6 +296,7 @@ extern Map *local_var_map;
 #define LOCAL_VAR_NUM (map->keys->len)
 int get_local_var_offset(char *name);
 int new_local_var_offset(char *name);
+char *nodeToStr(Node *node);
 
 // コード生成
 void gen(Node *node);

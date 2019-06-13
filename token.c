@@ -259,6 +259,12 @@ void tokenize() {
             continue;
         }
 
+        if (keyword(p, &np, "union")) {
+            push_token(TK_UNION, p);
+            p = np;
+            continue;
+        }
+
 
         if (isdigit(*p)) {
             Token *num_token = push_token(TK_NUM, p);

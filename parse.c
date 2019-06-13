@@ -147,7 +147,12 @@ Node *new_node_deref(Node *pt, Token *token) {
     return node;
 }
 
+int is_lvalue(Node * node);
 Node *new_node_get_ptr(Node *pt, Token *token) {
+    if (!is_lvalue(pt)) {
+        error_at_node(pt, "lvalueでありません: %d", pt->ty);
+    }
+
     Node *node = new_node(ND_GET_PTR, token);
     node->ptrof = pt;
     node->type = pointer_of(pt->type);
@@ -256,8 +261,8 @@ Node *array_term() {
 
         if ((token = consume(TK_ARROW))) {
             assert_at_node(node, node->type != NULL, "型が不明です");
-            if (!(node->type->ty == PTR && node->type->ptrof->ty == STRUCT)) {
-                error_at_token(token, "左辺がstructへのポインタでない");
+            if (!(node->type->ty == PTR && (node->type->ptrof->ty == STRUCT || node->type->ptrof->ty == UNION))) {
+                error_at_token(token, "左辺がstructまたはunionへのポインタでない");
             }
 
             Token *field_name = consume(TK_IDENT);
@@ -272,8 +277,8 @@ Node *array_term() {
 
         if ((token = consume(TK_DOT))) {
             assert_at_node(node, node->type != NULL, "型が不明です");
-            if (!(node->type->ty == STRUCT)) {
-                error_at_token(token, "左辺がstructでない");
+            if (!(node->type->ty == STRUCT || node->type->ty == UNION)) {
+                error_at_token(token, "左辺がstructまたはunionでない");
             }
 
             Token *field_name = consume(TK_IDENT);
@@ -313,17 +318,7 @@ Node *pointer_term() {
     }
 
     if ((token = consume(TK_AMP))) {
-        Node *pt;
-        pt = pointer_term();
-        if (pt->type->ty == ARRAY) {
-            return conv_a_to_p(pt);
-        }
-
-        if (!is_lvalue(pt)) {
-            error_at_node(pt, "lvalueでありません: %d", pt->ty);
-        }
-
-        return new_node_get_ptr(pt, token);
+        return new_node_get_ptr(pointer_term(), token);
     }
 
     return array_term();
@@ -567,7 +562,9 @@ Node *ptr_ident(Type *type) {
 Declarator *declarator(Type *type);
 void add_field(Type *type, Declarator *decl);
 
-Type *make_incomplete_struct_type(Token *token);
+Type *make_incomplete_struct_or_union_type(TypeId ty, Token *token);
+
+Type *struct_or_union(TypeId ty, Token *token);
 
 Type *type_spec() {
     Token *token;
@@ -581,66 +578,74 @@ Type *type_spec() {
         return &char_type;
     }
     
-    if ((token = consume(TK_STRUCT))) {
-        Type *type = NULL;
-        Token *id;
+    if ((token = consume(TK_STRUCT)) || (token = consume(TK_UNION))) {
+        TypeId ty = (token->ty == TK_STRUCT) ? STRUCT : UNION;
 
-        if ((id = consume(TK_IDENT))) {
-            type = get_struct(id->name);
-            if (type == NULL) {
-                type = make_incomplete_struct_type(token);
-                register_struct(id->name, type);
-            }
-        }
-
-        if (!consume(TK_LBRACE)) {
-            if (type != NULL) {
-                return type;
-            }
-            error_at_here("'{'がありません"); // 名前がなければ {..} が必要
-        }
-
-        // 無名の場合
-        if (type == NULL) {
-            type = make_incomplete_struct_type(token);
-        }
-
-        if (!type->incomplete) {
-            error_at_token(id, "二重定義です");
-        }
-
-        while (!consume(TK_RBRACE)) {
-            Type *field_type = type_spec();
-            if (field_type == NULL) {
-                error_at_here("フィールドの型がありません");
-            }
-            
-            Declarator *decl;
-            decl = declarator(field_type);
-            add_field(type, decl);
-            
-            while (consume(TK_COMMA)) {
-                decl = declarator(field_type);
-                add_field(type, decl);
-            }
-            
-            if (!consume(TK_SEMI)) {
-                error_at_here("';'がありません");
-            }
-        }
-
-        type->incomplete = 0;
-        
-        return type;
+        return struct_or_union(ty, token);
     }
 
     return NULL;
 }
 
+Type *struct_or_union(TypeId ty, Token *token) {
+    Type *type = NULL;
+    Token *id;
+
+    if ((id = consume(TK_IDENT))) {
+        type = get_struct(id->name);
+        if (type == NULL) {
+            type = make_incomplete_struct_or_union_type(ty, token);
+            register_struct(id->name, type);
+        } else if (ty != type->ty) {
+            error_at_token(id, "二重定義です");
+        }
+    }
+
+    if (!consume(TK_LBRACE)) {
+        if (type != NULL) {
+            return type;
+        }
+        error_at_here("'{'がありません"); // 名前がなければ {..} が必要
+    }
+
+    // 無名の場合
+    if (type == NULL) {
+        type = make_incomplete_struct_or_union_type(ty, token);
+    }
+
+    if (!type->incomplete) {
+        error_at_token(id, "二重定義です");
+    }
+
+    while (!consume(TK_RBRACE)) {
+        Type *field_type = type_spec();
+        if (field_type == NULL) {
+            error_at_here("フィールドの型がありません");
+        }
+
+        Declarator *decl;
+        decl = declarator(field_type);
+        add_field(type, decl);
+
+        while (consume(TK_COMMA)) {
+            decl = declarator(field_type);
+            add_field(type, decl);
+        }
+
+        if (!consume(TK_SEMI)) {
+            error_at_here("';'がありません");
+        }
+    }
+
+    type->incomplete = 0;
+
+    return type;
+}
+
 // 空の不完全なstruct型を作る
-Type *make_incomplete_struct_type(Token *token) {
+Type *make_incomplete_struct_or_union_type(TypeId ty, Token *token) {
     Type *type = malloc(sizeof(Type));
-    type->ty = STRUCT;
+    type->ty = ty;
     type->token = token;
     type->fields = new_map();
     type->alignment = 1;
@@ -657,11 +662,24 @@ void add_field(Type *type, Declarator *decl) {
     }
 
     int alignment = get_alignment(decl->type);
-    int offset = round_up(type->next_offset, alignment);
-
     type->alignment = max(type->alignment, alignment);
-    type->next_offset = offset + get_size_of(decl->type);
-    type->size = round_up(type->next_offset, type->alignment);
+    
+    
+    int offset;
+    int size = get_size_of(decl->type);
+
+    if (type->ty == STRUCT) {
+        offset = round_up(type->next_offset, alignment);
+
+        type->next_offset = offset + size;
+        type->size = round_up(type->next_offset, type->alignment);
+    } else {
+        offset = 0;
+        type->size = max(
+                round_up(type->size, type->alignment),
+                round_up(size, type->alignment)
+                );
+    }
 
     Field *field = malloc(sizeof(Field));
     field->type = decl->type;
@@ -697,8 +715,6 @@ Node *local_var_def(Type *type) {
     Node *node = new_node(ND_LOCAL_VAR_DEF, decl->id); // XXX: とりらえず最初の識別子トークンで代表
     node->decl_inits = vec;
     node->local_vars = local_vars;
-
-    
 
     return node;
 }
@@ -1261,3 +1277,126 @@ Node *program() {
     node->strings = strings;
     return node;
 }
+
+char *binopToStr(char *op, Node *node);
+
+char *nodeVectorToStr(const Vector *vec, char *sep);
+
+char *nodeToStr(Node *node) {
+    switch (node->ty) {
+        case ND_NUM:
+            return strprintf("(NUM %d)", node->val);
+        case ND_ADD:
+            return binopToStr("+", node);
+        case ND_SUB:
+            return binopToStr("-", node);
+        case ND_MUL:
+            return binopToStr("*", node);
+        case ND_DIV:
+            return binopToStr("/", node);
+        case ND_LT:
+            return binopToStr("<", node);
+        case ND_ASSIGN:
+            return binopToStr("=", node);
+        case ND_IDENT:
+            return strprintf("(ID %s)", node->token->name);
+        case ND_LOCAL_VAR:
+            return strprintf("(LV %s %s)", typeToStr(node->type), node->token->name);
+        case ND_GLOBAL_VAR:
+            return strprintf("(GV %s %s)", typeToStr(node->type), node->token->name);
+        case ND_CALL: {
+            return strprintf("(CALL %s %s)", node->name, nodeVectorToStr(node->params, " "));
+        }
+        case ND_EQ:
+            return binopToStr("==", node);
+        case ND_NE:
+            return binopToStr("!=", node);
+        case ND_LE:
+            return binopToStr("<=", node);
+        case ND_STRING:
+            return strprintf("\"%s\"", node->token->str);
+        case ND_ARROW:
+            return strprintf("(-> %s %s %s)", typeToStr(node->type), nodeToStr(node->term), node->field_name->name);
+        case ND_DEREF:
+            return strprintf("(DEREF %s %s)", typeToStr(node->type), nodeToStr(node->ptrto));
+        case ND_GET_PTR:
+            return strprintf("(GET_PTR %s %s)", typeToStr(node->type), nodeToStr(node->ptrof));
+        case ND_EMPTY:
+            return "(EMPTY)";
+        case ND_RETURN:
+            return strprintf("(RETURN %s)", nodeToStr(node->lhs));
+        case ND_IF:
+            return strprintf("(IF %s %s %s)",
+                    nodeToStr(node->cond),
+                    nodeToStr(node->stmt),
+                    node->else_stmt ? nodeToStr(node->else_stmt) : ""
+                    );
+        case ND_WHILE:
+            return strprintf("(WHILE %s %s)", nodeToStr(node->cond), nodeToStr(node->stmt));
+        case ND_FOR:
+            return strprintf("(FOR %s %s %s %s)",
+                    node->init ? nodeToStr(node->init) : "()",
+                    node->cond ? nodeToStr(node->cond) : "()",
+                    node->next ? nodeToStr(node->next) : "()",
+                    nodeToStr(node->stmt)
+                    );
+        case ND_EXPR:
+            return strprintf("(EXPR %s)", nodeToStr(node->lhs));
+        case ND_PROGRAM: {
+            return nodeVectorToStr(node->top_levels, "\n# ");
+        }
+        case ND_FUNC:
+            return strprintf("(FUNC %s %s)", node->name, nodeToStr(node->stmt));
+        case ND_BLOCK: {
+            return nodeVectorToStr(node->stmts, " ");
+        }
+        case ND_LOCAL_VAR_DEF:
+            return "(ND_LOCAL_VAR_DEF)";
+        case ND_GLOBAL_VAR_DEF:
+            return "(ND_GLOBAL_VAR_DEF)";
+        default:
+            error("nodeToStr: not implemented: %d", node->ty);
+    }
+}
+
+typedef struct StringBuf {
+    char *buf;
+    size_t len;
+    size_t allocated;
+} StringBuf;
+
+StringBuf *new_string_buf() {
+    StringBuf *ret = malloc(sizeof(StringBuf));
+    ret->len = 0;
+    ret->allocated = 16;
+    ret->buf = malloc(ret->allocated);
+    return ret;
+}
+
+void string_buf_add(StringBuf *buf, char *s) {
+    size_t new_len = buf->len + strlen(s);
+
+    if (buf->allocated < new_len + 1) {
+        while (buf->allocated < new_len + 1) {
+            buf->allocated *= 2;
+        }
+        buf->buf = realloc(buf->buf, buf->allocated);
+    }
+
+    strcpy(buf->buf + buf->len, s);
+    buf->len = new_len;
+}
+
+char *binopToStr(char *op, Node *node) {
+    return strprintf("(%s %s %s)", op, nodeToStr(node->lhs), nodeToStr(node->rhs));
+}
+
+char *nodeVectorToStr(const Vector *vec, char *sep) {
+    StringBuf *buf = new_string_buf();
+    for (int i = 0; i < vec->len; i++) {
+        string_buf_add(buf, nodeToStr(vec->data[i]));
+        string_buf_add(buf, sep);
+    }
+    return buf->buf;
+}
+

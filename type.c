@@ -67,6 +67,7 @@ int get_size_of(Type *type) {
         case ARRAY:
             return get_size_of(type->ptrof) * type->len;
         case STRUCT:
+        case UNION:
             return type->size;
         default:
             error("unknown type(get_size_of): %d", type->ty);
@@ -85,6 +86,7 @@ int get_alignment(Type *type) {
         case ARRAY:
             return get_alignment(type->ptrof);
         case STRUCT:
+        case UNION:
             return type->alignment;
         default:
             error("unknown type(get_alignment): %d", type->ty);
@@ -104,6 +106,8 @@ char *tyToStr(TypeId ty) {
             return "array";
         case STRUCT:
             return "struct";
+        case UNION:
+            return "union";
         default:
             error("unknown type(tyToStr): %d", ty);
     }
@@ -112,12 +116,12 @@ char *tyToStr(TypeId ty) {
 char *typeToStr(Type *type) {
     switch (type->ty) {
         case PTR:
-            return strprintf("ptr of %s", typeToStr(type->ptrof));
+            return strprintf("(ptr %s)", typeToStr(type->ptrof));
         case ARRAY:
             if (type->incomplete) {
-                return strprintf("array[] of %s", typeToStr(type->ptrof));
+                return strprintf("(array () %s)", typeToStr(type->ptrof));
             } else {
-                return strprintf("array[%d] of %s", type->len, typeToStr(type->ptrof));
+                return strprintf("(array %d %s)", type->len, typeToStr(type->ptrof));
             }
         default:
             return tyToStr(type->ty);

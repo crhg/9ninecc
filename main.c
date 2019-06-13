@@ -28,6 +28,8 @@ int main(int argc, char **argv) {
     // パース
     Node *prog = program();
 
+    printf("# %s\n", nodeToStr(prog));
+
     // アセンブリの前半部分を出力
     printf(".intel_syntax noprefix\n");
 

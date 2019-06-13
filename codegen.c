@@ -608,15 +608,23 @@ void gen(Node *node) {
     }
 
     if (node->ty == ND_DEREF) {
+        if (node->type == NULL) {
+            error_at_node(node, "ND_DEREF: type is NULL\n");
+        }
+
         print_comment_start("ND_DEREF");
+
+        if (node->type->ty == ARRAY) { // 暗黙のポインタ変換
+            print_comment("配列型の暗黙のポインタ変換");
+            gen(node->ptrto);
+            print_comment_end("ND_DEREF");
+            return;
+        }
 
         gen(node->ptrto);
         print_comment("ND_DEREF: ptrto compiled");
 
         printf("  pop rax\n");
-        if (node->type == NULL) {
-            error_at_node(node, "ND_DEREF: type is NULL\n");
-        }
 
         switch (node->type->ty) {
             case INT:
@@ -640,6 +648,11 @@ void gen(Node *node) {
     }
 
     if (node->ty == ND_GET_PTR) {
+        // &(*x) = x
+        if (node->ptrof->ty == ND_DEREF) {
+            gen(node->ptrof->ptrto);
+            return;
+        }
         gen_lval(node->ptrof);
         return;
     }
