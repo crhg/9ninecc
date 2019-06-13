@@ -831,3 +831,29 @@ int test107() {
     return u.x;
 }
 // @end
+
+// @try_out test108 108hoge
+struct S108 {
+    int x;
+    char y[20];
+};
+
+struct S108 s108 = { .x = 108, .y = "hoge" };
+
+int test108() {
+    try_printf("%d%s", s108.x, s108.y);
+}
+// @end
+
+// @try_ret test109 109
+union U109 {
+    int x;
+    char y[5];
+};
+
+union U109 u109 = { .x = 109 };
+
+int test109() {
+    return u109.x;
+}
+// @end

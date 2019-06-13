@@ -378,6 +378,48 @@ void gen_local_var_def(Node *node) {
 
 void gen_global_var_init_data(Type *type, Initializer *init);
 
+void gen_global_struct_init(Type *type, Initializer *init) {
+    int last_end = 0;
+    for (int i = 0; i < type->fields->keys->len; i++) {
+        char *name = type->fields->keys->data[i];
+        Field *field = type->fields->vals->data[i];
+
+        Initializer *i = map_get(init->map, name);
+        if (i != NULL) {
+            // 最後に書き込んだところからもし間が空いていたら0で埋める
+            if (last_end < field->offset) {
+                printf("  .zero %d\n", field->offset - last_end);
+            }
+
+            gen_global_var_init_data(field->type, i);
+            last_end = field->offset + field->type->size;
+        }
+
+    }
+
+    // 最後に残った領域を全て0で埋める
+    if (last_end < type->size) {
+        printf("  .zero %d\n", type->size - last_end);
+    }
+}
+
+void gen_global_union_init(Type *type, Initializer *init) {
+    int last_end = 0;
+
+    if (init->map->keys->len > 0) {
+        char *name = init->map->keys->data[0];
+        Initializer *i = init->map->vals->data[0];
+        Field *field = map_get(type->fields, name);
+        gen_global_var_init_data(field->type, i);
+        last_end = field->type->size;
+    }
+
+    // 最後に残った領域を全て0で埋める
+    if (last_end < type->size) {
+        printf("  .zero %d\n", type->size - last_end);
+    }
+}
+
 void gen_global_array_init(Type *type, Initializer *init) {
     if (init->ty == INITIALIZER_TYPE_EXPR && init->expr->ty == ND_STRING) {
         if (type->ptrof->ty != CHAR) {
@@ -540,6 +582,12 @@ void gen_global_var_init_data(Type *type, Initializer *init) {
             break;
         case ARRAY:
             gen_global_array_init(type, init);
+            break;
+        case STRUCT:
+            gen_global_struct_init(type, init);
+            break;
+        case UNION:
+            gen_global_union_init(type, init);
             break;
         default:
             error("型がおかしい(gen_global_var_def");
