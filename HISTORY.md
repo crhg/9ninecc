@@ -121,7 +121,8 @@ for文も同じ問題がある(対処してないからねー)
 
 ### [関数呼び出し(無引数)](https://github.com/crhg/9ninecc/commit/dd5ec568000ec222709814968b3575daf726bef3)
 
-いつの時点でスタックが16バイト境界を指しているべきなのかよくわからなくていろいろ調べる。関数が呼ばれたときに16バイト境界にあればいいらしい。
+いつの時点でスタックが16バイト境界を指しているべきなのかよくわからなくていろいろ調べる。~~関数が呼ばれたときに16バイト境界にあればいいらしい。
+~~ call命令の直前に16バイト境界にあればいい。
 
 呼び出し時店でのスタック位置を知るやり方は関数の先頭で16バイト境界にあったとして文の区切りではスタックが戻っているはずだから0クリアしてその後の増減を追いかける方法しか思いつかなくて愚直に実装。
 
@@ -662,6 +663,127 @@ TODO作ったときに空文は一瞬でできそうだなと思ったので作�
 
 忘れそうなのでコメントに書いておく。
 
+## 2019-06-11
 
+### [ヒストリ追記](https://github.com/crhg/9ninecc/commit/fc709d630c26d9b1553ef421aac0012ecd778d01)
 
+### [型のincompleteフラグ](https://github.com/crhg/9ninecc/commit/fc31985e4c1c585f285a4d1ce587fee497b42e2d)
 
+名前つきstructの実装に先立ち、長さが決まっていない配列型のincomplete_lenフラグを中身がまだ決まっていない名前だけのstruct型にも使えるようにincompleteと名前を変更。
+
+### [TODO追加](https://github.com/crhg/9ninecc/commit/81a2e94eff8a44acbbf2eb543518b2ceb767e648)
+
+### [名前つきのstruct](https://github.com/crhg/9ninecc/commit/45f11d4a1b32fccbb06f5354480bafb212631256)
+
+以下のように実装。
+
+* 構造体の名前と型の対応表をグローバルなMapとして用意。
+
+* 構造体の中身が定義されたらimcompleteが0(false)になる。
+
+## 2019-06-12
+
+### [TODO追加](https://github.com/crhg/9ninecc/commit/580d78f28a1c5d71aa164d39df43e7e56f9ca95f)
+
+### [識別子に英大文字が使えない問題が見つかったので修正](https://github.com/crhg/9ninecc/commit/479a9356bbe592dd496f797f451b24fa1ab3517f)
+
+すこしテストを追加したら識別子に英大文字が使えない問題が発覚した。修正。
+
+### [変数を定義しないstructだけの宣言ができるようにする](https://github.com/crhg/9ninecc/commit/cf4f7830187ec182875f047a4ff54b472d21f9bf)
+
+<type_spec>のあとに<declarator>ではなく';'が来ても受け入れるようにした。
+
+本当はintのようになにも宣言しない<type_spec>の場合は受け入れてはいけないのだけどそれは未実装。
+
+### [TODO更新](https://github.com/crhg/9ninecc/commit/ab3c04451cb6203c1a50c780cc05b8953adfe3a2)
+
+### [不要なコードを整理](https://github.com/crhg/9ninecc/commit/5cae65293a0413fbb12bb7dfe2ab97ad93345d80)
+
+### [関数呼び出しのスタック調整の説明を読み間違えていたので修正](https://github.com/crhg/9ninecc/commit/bfaef588bbd80603fcce4cd81c11b239c71c637a)
+
+よくテキストを読んだらcall命令の実行前にスタックポインタが16バイト境界にあることとはっきり書いてあったので修正。
+
+### [TODO更新](https://github.com/crhg/9ninecc/commit/e0132c01d8ea7a50545ef18388118aac5abedf1f)
+
+### [CLionのデバッガでの表示をみやすくするため、1文字のトークンやノードにも名前を付ける](https://github.com/crhg/9ninecc/commit/fa04c93020fe113fc544951077f78e781c1cb57a)
+
+トークンやノードの種類を表すのに1文字の記号については文字コードをそのまま使うようになっていたけど、CLionで以下の問題があるので全部に名前を付けた。
+
+* デバッガでは文字コードの数値で表示されるのでどの文字かわかりにくい。(enumで名前がついていれば名前で表示してくれる)
+
+* 文字定数だとFind Usageが使えない(文字列でのサーチになる)
+
+### [記号と名前の対照表からenum宣言の中身を作るツール](https://github.com/crhg/9ninecc/commit/f40f3356263681953d66172b46d75caba1d3df59)
+
+### [使われなくなったコードを削除](https://github.com/crhg/9ninecc/commit/a58dac1506ff7ea7ff817c287ca0355a471c5ab9)
+
+## 2019-06-13
+
+### [union](https://github.com/crhg/9ninecc/commit/6e3fddc962329b00220b0193fb590c4445915177)
+
+structとあまり違わないのですぐにできた。違いは以下ぐらい。
+
+* オフセットは常に0
+* 全体のサイズの計算方法が異なる(フィールドのサイズのmaxを全体のアラインメントの倍数に切り上げ)
+
+しかし、何故かバグって悩む。構文木を表示するデバッグ出力などを作成した。
+結局どこかでノード自体の型とノードが指すノードの型を取り違えてたのが原因だった。
+
+木をちゃんと木らしくインデントつけて表示するのは面倒だったので、LispのS式風の出力にした。(長いときはemacsに貼って整形する前提)
+
+デバッグ出力の部分は分けてコミットすればよかったと後で思う。
+
+### [TODO更新](https://github.com/crhg/9ninecc/commit/89b6d0f84b4c86be86fa51adad90645ec5a0a623)
+
+### [structおよびunionのローカル変数の初期化](https://github.com/crhg/9ninecc/commit/7df798b705e4c3ad543c8f5379d3d1d084f27c37)
+
+struct,union用の初期化リストを読み込んで初期化されるフィールドは再帰的に初期化コード生成、初期値が割り当たってないフィールドは0埋めという感じで書いた。
+
+### [structおよびunionのグローバル変数の初期化](https://github.com/crhg/9ninecc/commit/35674006c7ecf8f736701e4954cb4238bddf06a7)
+
+グローバル変数も同じような感じ。0埋めが.zeroを生成するだけでいいのでむしろ楽。
+
+#### 謎の`.align 16`
+
+実装前にgccの生成するコードを見ていたら、
+
+```C
+typedef struct A {
+    int x;
+    char s[20];
+} A;
+
+A a = { .x = 10, .s = "hoge"};
+```
+
+が
+
+```asm
+        .globl  a
+        .data
+        .align 16
+        .type   a, @object
+        .size   a, 24
+a:
+        .long   10
+        .string "hoge"
+        .zero   15
+```
+
+となっていて、どこから`.align 16`が出てくるのか謎だった。
+
+https://software.intel.com/sites/default/files/article/402129/mpx-linux64-abi.pdf の 3.1.2
+Machine Interface Processor Architecture Data Representation に
+
+> Aggregates and Unions
+> Structures and unions assume the alignment of their most strictly aligned compo- nent. Each member is assigned to the lowest available offset with the appropriate alignment. The size of any object is always a multiple of the object‘s alignment.
+> An array uses the same alignment as its elements, except that a local or global array variable of length at least 16 bytes or a C99 variable-length array variable always has alignment of at least 16 bytes.4
+> Structure and union objects can require padding to meet size and alignment constraints. The contents of any padding is undefined.
+
+とあり、これを単独の構造体変数にも16バイトを以上なら適用しているっぽい。
+
+この規定の理由は注4に書いてあって、
+
+> The alignment requirement allows the use of SSE instructions when operating on the array. The compiler cannot in general calculate the size of a variable-length array (VLA), but it is ex- pected that most VLAs will require at least 16 bytes, so it is logical to mandate that VLAs have at least a 16-byte alignment.
+
+SSE使いたいからのようです。(SSEの128bitレジスタは16バイト境界にあるデータしか読み書きできない)
